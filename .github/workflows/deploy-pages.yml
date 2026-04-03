@@ -1,4 +1,4 @@
-name: Deploy chatbot-core-saas dist to GitHub Pages
+name: Deploy chatbot-core-saas to GitHub Pages
 
 on:
   push:
