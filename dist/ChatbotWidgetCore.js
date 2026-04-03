@@ -2,6 +2,7 @@ import { DEFAULT_WELCOME_MESSAGE } from "./defaults.js";
 import { renderLandscapeLayout } from "./layouts/landscapeLayout.js";
 import { renderNormalLayout } from "./layouts/normalLayout.js";
 import { MockChatTransport } from "./mock/mockTransport.js";
+import { createLocalStorageConversationStore } from "./storage/localStorageConversationStore.js";
 import { applyThemeTokens, createWidgetStyles } from "./styles.js";
 import { deepFreeze } from "./utils/deepFreeze.js";
 import { mergeConfig } from "./utils/mergeConfig.js";
@@ -15,16 +16,35 @@ function defaultIdFactory() {
 function randomScopeClass() {
     return `ccs-scope-${Math.random().toString(16).slice(2, 10)}`;
 }
+function toPositionClass(position) {
+    return `ccs-pos-${position}`;
+}
 export class ChatbotWidgetCore {
     config;
     transport;
+    presenceAdapter;
     idFactory;
+    now;
     scopeClass;
+    conversationStore;
+    actionApi;
     currentMode;
+    conversationId = null;
     messages = [];
     host = null;
     renderRoot = null;
     usingShadowDom = false;
+    isOpen;
+    teaserVisible = false;
+    teaserDismissed = false;
+    isThinking = false;
+    thinkingText;
+    teaserTimeoutId = null;
+    thinkingIntervalId = null;
+    presenceIntervalId = null;
+    presenceInFlight = false;
+    visibilityListener = null;
+    focusListener = null;
     static fromScript(scriptElement, options = {}) {
         const scriptConfig = loadConfigFromScript(scriptElement);
         return new ChatbotWidgetCore(scriptConfig, options);
@@ -36,8 +56,25 @@ export class ChatbotWidgetCore {
         this.config = deepFreeze(merged);
         this.currentMode = this.config.mode;
         this.transport = options.transport ?? new MockChatTransport();
+        this.presenceAdapter = options.presenceAdapter ?? null;
         this.idFactory = options.idFactory ?? defaultIdFactory;
+        this.now = options.now ?? (() => Date.now());
         this.scopeClass = randomScopeClass();
+        this.isOpen = this.config.initiallyOpen;
+        this.thinkingText = this.config.thinking.messages[0] ?? "Thinking...";
+        this.actionApi = {
+            sendMessage: (text) => this.sendMessage(text),
+            open: () => this.open(),
+            close: () => this.close(),
+            toggle: () => this.toggle(),
+            clearConversation: () => this.clearConversation()
+        };
+        this.conversationStore =
+            options.conversationStore ??
+                (this.config.storage.enabled
+                    ? createLocalStorageConversationStore(this.config.storage.key)
+                    : null);
+        this.hydrateFromStore();
     }
     getConfig() {
         return this.config;
@@ -47,6 +84,88 @@ export class ChatbotWidgetCore {
     }
     getMessages() {
         return this.messages;
+    }
+    getConversationId() {
+        return this.conversationId;
+    }
+    isWidgetOpen() {
+        return this.isOpen;
+    }
+    open(source = "api") {
+        if (this.isOpen) {
+            return;
+        }
+        this.isOpen = true;
+        this.teaserVisible = false;
+        this.teaserDismissed = true;
+        this.clearTeaserTimer();
+        this.stopThinking();
+        this.render();
+        this.persistSnapshot();
+        this.startPresencePollingIfNeeded();
+        this.config.lifecycle.onOpenChange?.({
+            isOpen: true,
+            source,
+            timestamp: this.now()
+        });
+        this.config.lifecycle.onTeaser?.({
+            visible: false,
+            reason: "open",
+            timestamp: this.now()
+        });
+    }
+    close(source = "api") {
+        if (!this.isOpen) {
+            return;
+        }
+        this.isOpen = false;
+        this.stopThinking();
+        if (!this.config.presence.pollWhenClosed) {
+            this.stopPresencePolling();
+        }
+        this.scheduleTeaserIfNeeded();
+        this.render();
+        this.persistSnapshot();
+        this.config.lifecycle.onOpenChange?.({
+            isOpen: false,
+            source,
+            timestamp: this.now()
+        });
+    }
+    toggle() {
+        if (this.isOpen) {
+            this.close("toggle");
+            return;
+        }
+        this.open("toggle");
+    }
+    clearConversation() {
+        this.stopThinking();
+        this.messages = [];
+        this.conversationId = null;
+        this.presenceInFlight = false;
+        if (this.conversationStore) {
+            this.conversationStore.clear();
+        }
+        const welcomeMessage = this.createMessage("assistant", this.resolveWelcomeMessage());
+        this.messages.push(welcomeMessage);
+        this.render();
+        this.persistSnapshot();
+    }
+    dismissTeaser() {
+        if (!this.teaserVisible && this.teaserDismissed) {
+            return;
+        }
+        this.teaserVisible = false;
+        this.teaserDismissed = true;
+        this.clearTeaserTimer();
+        this.render();
+        this.persistSnapshot();
+        this.config.lifecycle.onTeaser?.({
+            visible: false,
+            reason: "dismiss",
+            timestamp: this.now()
+        });
     }
     mount(host) {
         if (!(host instanceof HTMLElement)) {
@@ -58,14 +177,19 @@ export class ChatbotWidgetCore {
             const welcomeMessage = this.createMessage("assistant", this.resolveWelcomeMessage());
             this.messages.push(welcomeMessage);
         }
+        this.attachPresenceVisibilityHandlers();
+        this.scheduleTeaserIfNeeded();
         this.render();
+        this.startPresencePollingIfNeeded();
+        this.persistSnapshot();
         const welcomeMessage = this.messages[0];
         if (welcomeMessage) {
             this.config.lifecycle.onInitialize?.({
                 mode: this.currentMode,
+                isOpen: this.isOpen,
                 config: this.config,
                 welcomeMessage,
-                timestamp: Date.now()
+                timestamp: this.now()
             });
         }
     }
@@ -73,6 +197,10 @@ export class ChatbotWidgetCore {
         if (!this.host || !this.renderRoot) {
             return;
         }
+        this.clearTeaserTimer();
+        this.stopThinking();
+        this.detachPresenceVisibilityHandlers();
+        this.stopPresencePolling();
         if (this.usingShadowDom) {
             this.renderRoot.innerHTML = "";
         }
@@ -84,6 +212,9 @@ export class ChatbotWidgetCore {
         this.renderRoot = null;
     }
     setMode(nextMode) {
+        if (!this.config.allowRuntimeModeSwitch) {
+            return;
+        }
         if (nextMode === this.currentMode) {
             return;
         }
@@ -95,8 +226,9 @@ export class ChatbotWidgetCore {
         this.config.lifecycle.onToggleLayout?.({
             previousMode,
             nextMode,
-            timestamp: Date.now()
+            timestamp: this.now()
         });
+        this.persistSnapshot();
     }
     async sendMessage(rawText) {
         if (!this.renderRoot) {
@@ -111,39 +243,56 @@ export class ChatbotWidgetCore {
         this.config.lifecycle.onMessageSent?.({
             mode: this.currentMode,
             message: userMessage,
-            timestamp: Date.now()
+            timestamp: this.now()
         });
-        const assistantMessage = this.createMessage("assistant", "");
+        const assistantMessage = this.createMessage("assistant", "", "pending");
         this.messages.push(assistantMessage);
+        this.startThinking();
+        this.render();
+        this.persistSnapshot();
         const streamState = { error: null };
         await this.transport.sendMessage({
             message: userMessage,
             history: [...this.messages],
-            config: this.config
+            config: this.config,
+            conversationId: this.conversationId
         }, {
             onChunk: (chunk) => {
                 assistantMessage.text = `${assistantMessage.text}${chunk}`;
+                assistantMessage.state = "streaming";
+                this.startThinking();
                 this.config.lifecycle.onStreamUpdate?.({
                     messageId: assistantMessage.id,
                     chunk,
                     accumulatedText: assistantMessage.text,
                     isFinal: false,
-                    timestamp: Date.now()
+                    timestamp: this.now()
                 });
                 this.render();
             },
-            onComplete: () => {
+            onComplete: (meta) => {
+                assistantMessage.state = "complete";
+                if (meta?.actions) {
+                    assistantMessage.actions = meta.actions;
+                }
+                if (meta?.conversationId) {
+                    this.conversationId = meta.conversationId;
+                }
+                this.stopThinking();
                 this.config.lifecycle.onStreamUpdate?.({
                     messageId: assistantMessage.id,
                     chunk: "",
                     accumulatedText: assistantMessage.text,
                     isFinal: true,
-                    timestamp: Date.now()
+                    timestamp: this.now()
                 });
                 this.render();
+                this.persistSnapshot();
             },
             onError: (error) => {
                 streamState.error = error;
+                assistantMessage.state = "error";
+                this.stopThinking();
             }
         });
         if (streamState.error) {
@@ -174,51 +323,13 @@ export class ChatbotWidgetCore {
         }
         return DEFAULT_WELCOME_MESSAGE;
     }
-    createMessage(role, text) {
+    createMessage(role, text, state = "complete") {
         return {
             id: this.idFactory(),
             role,
             text,
-            createdAt: Date.now()
+            state,
+            createdAt: this.now()
         };
     }
-    render() {
-        if (!this.renderRoot) {
-            return;
-        }
-        const layout = this.currentMode === "landscape"
-            ? renderLandscapeLayout(this.messages, this.currentMode)
-            : renderNormalLayout(this.messages, this.currentMode);
-        const styleTag = `<style>${createWidgetStyles(this.usingShadowDom ? null : this.scopeClass)}</style>`;
-        this.renderRoot.innerHTML = `${styleTag}${layout}`;
-        const rootElement = this.renderRoot.querySelector(".ccs-root");
-        if (!(rootElement instanceof HTMLElement)) {
-            throw new Error("Widget root failed to render.");
-        }
-        applyThemeTokens(rootElement, this.config.theme.tokens, this.config.theme.fontFamilies);
-        this.bindUi(rootElement);
-    }
-    bindUi(rootElement) {
-        const modeButtons = rootElement.querySelectorAll("[data-set-mode]");
-        modeButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-                const nextMode = button.dataset.setMode;
-                if (nextMode === "normal" || nextMode === "landscape") {
-                    this.setMode(nextMode);
-                }
-            });
-        });
-        const form = rootElement.querySelector("[data-chat-form]");
-        const input = rootElement.querySelector("[data-chat-input]");
-        if (!form || !input) {
-            return;
-        }
-        form.addEventListener("submit", (event) => {
-            event.preventDefault();
-            const value = input.value;
-            input.value = "";
-            void this.sendMessage(value).catch(() => undefined);
-        });
-    }
-}
-//# sourceMappingURL=ChatbotWidgetCore.js.map
+    // ... (rest of file omitted for brevity in this tool upload request)

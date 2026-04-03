@@ -26,6 +26,37 @@ function mergeLifecycle(modeLifecycle, initLifecycle) {
         ...(initLifecycle ?? {})
     };
 }
+function mergeTeaser(input) {
+    return {
+        ...CORE_DEFAULT_CONFIG.teaser,
+        ...(input ?? {})
+    };
+}
+function mergeStorage(input) {
+    return {
+        ...CORE_DEFAULT_CONFIG.storage,
+        ...(input ?? {})
+    };
+}
+function mergePresence(input) {
+    return {
+        ...CORE_DEFAULT_CONFIG.presence,
+        ...(input ?? {})
+    };
+}
+function mergeThinking(input) {
+    return {
+        ...CORE_DEFAULT_CONFIG.thinking,
+        ...(input ?? {}),
+        messages: cloneStringArray(input?.messages, CORE_DEFAULT_CONFIG.thinking.messages)
+    };
+}
+function mergeActionHandlers(input) {
+    return {
+        ...CORE_DEFAULT_CONFIG.actionHandlers,
+        ...(input ?? {})
+    };
+}
 export function mergeConfig(initConfig, options = {}) {
     validateConfigInput(initConfig, "initConfig");
     if (options.implementationThemeDefaults) {
@@ -43,6 +74,11 @@ export function mergeConfig(initConfig, options = {}) {
         ...initConfig,
         mode: selectedMode,
         theme: mergedTheme,
+        teaser: mergeTeaser(initConfig.teaser),
+        storage: mergeStorage(initConfig.storage),
+        presence: mergePresence(initConfig.presence),
+        thinking: mergeThinking(initConfig.thinking),
+        actionHandlers: mergeActionHandlers(initConfig.actionHandlers),
         lifecycle: mergedLifecycle
     };
     validateResolvedConfig(mergedConfig);

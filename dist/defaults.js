@@ -1,60 +1,98 @@
 export const DEFAULT_WELCOME_MESSAGE = "Welcome. How can I help you today?";
+export const DEFAULT_THINKING_MESSAGES = [
+    "Thinking...",
+    "Looking up the best answer...",
+    "Still with you..."
+];
 export const CORE_DEFAULT_THEME = {
     name: "core-default",
     tokens: {
         colorSurface: "#ffffff",
-        colorPanel: "#f6f8fb",
-        colorPrimary: "#1f6feb",
-        colorText: "#101828",
-        colorMutedText: "#475467",
-        colorBorder: "#d0d5dd",
-        borderRadius: "12px",
+        colorPanel: "#f7f8fb",
+        colorPrimary: "#1c63d5",
+        colorText: "#162033",
+        colorMutedText: "#566176",
+        colorBorder: "#d8dfec",
+        borderRadius: "16px",
         spacing: "12px"
     },
-    fontFamilies: ["system-ui", "Segoe UI", "sans-serif"]
+    fontFamilies: ["'Segoe UI'", "Tahoma", "Geneva", "Verdana", "sans-serif"]
 };
 export const CORE_DEFAULT_CONFIG = {
     mode: "normal",
     apiEndpoint: "",
     socketUrl: "",
+    title: "Assistant",
+    position: "bottom-right",
+    inputPlaceholder: "Type your message...",
+    initiallyOpen: false,
+    allowRuntimeModeSwitch: false,
+    showRefreshButton: true,
     theme: CORE_DEFAULT_THEME,
+    teaser: {
+        enabled: true,
+        delayMs: 10_000,
+        title: "Need a hand?",
+        text: "Ask a question and get an instant answer."
+    },
+    storage: {
+        enabled: true,
+        key: "chatbot-core-saas:conversation",
+        maxMessages: 80,
+        persistOpenState: true
+    },
+    presence: {
+        enabled: false,
+        intervalMs: 60_000,
+        pauseWhenHidden: true,
+        pollWhenClosed: false
+    },
+    thinking: {
+        messages: DEFAULT_THINKING_MESSAGES,
+        intervalMs: 2_000
+    },
+    actionHandlers: {},
     lifecycle: {},
     useShadowDom: true
 };
 export const MODE_DEFAULTS = {
     normal: {
         mode: "normal",
+        title: "Assistant",
+        position: "bottom-right",
         theme: {
             name: "normal-default",
             tokens: {
                 colorSurface: "#ffffff",
-                colorPanel: "#f6f8fb",
-                colorPrimary: "#1f6feb",
-                colorText: "#101828",
-                colorMutedText: "#475467",
-                colorBorder: "#d0d5dd",
-                borderRadius: "12px",
+                colorPanel: "#f7f8fb",
+                colorPrimary: "#1c63d5",
+                colorText: "#162033",
+                colorMutedText: "#566176",
+                colorBorder: "#d8dfec",
+                borderRadius: "16px",
                 spacing: "12px"
             },
-            fontFamilies: ["system-ui", "Segoe UI", "sans-serif"]
+            fontFamilies: ["'Segoe UI'", "Tahoma", "Geneva", "Verdana", "sans-serif"]
         },
         lifecycle: {}
     },
     landscape: {
         mode: "landscape",
+        title: "Assistant",
+        position: "bottom-right",
         theme: {
             name: "landscape-default",
             tokens: {
                 colorSurface: "#ffffff",
-                colorPanel: "#eef4ff",
-                colorPrimary: "#1252c7",
-                colorText: "#0f172a",
-                colorMutedText: "#334155",
-                colorBorder: "#cbd5e1",
+                colorPanel: "#f1f5fc",
+                colorPrimary: "#0d5ac7",
+                colorText: "#132038",
+                colorMutedText: "#48566f",
+                colorBorder: "#c7d2e6",
                 borderRadius: "14px",
-                spacing: "14px"
+                spacing: "12px"
             },
-            fontFamilies: ["system-ui", "Segoe UI", "sans-serif"]
+            fontFamilies: ["'Segoe UI'", "Tahoma", "Geneva", "Verdana", "sans-serif"]
         },
         lifecycle: {}
     }
