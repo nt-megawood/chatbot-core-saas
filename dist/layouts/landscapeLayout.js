@@ -1,4 +1,4 @@
-import { renderMessageList, renderModeToggle } from "./shared";
+import { renderMessageList, renderModeToggle } from "./shared.js";
 export function renderLandscapeLayout(messages, currentMode) {
     return `<section class="ccs-root ccs-layout-landscape">
     <header class="ccs-header">

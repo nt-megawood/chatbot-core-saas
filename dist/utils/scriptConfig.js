@@ -1,4 +1,4 @@
-import { validateConfigInput } from "./validateConfig";
+import { validateConfigInput } from "./validateConfig.js";
 function parseBoolean(rawValue, path) {
     if (rawValue === "true") {
         return true;

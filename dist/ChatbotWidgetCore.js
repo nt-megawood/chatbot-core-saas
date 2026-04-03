@@ -1,11 +1,11 @@
-import { DEFAULT_WELCOME_MESSAGE } from "./defaults";
-import { renderLandscapeLayout } from "./layouts/landscapeLayout";
-import { renderNormalLayout } from "./layouts/normalLayout";
-import { MockChatTransport } from "./mock/mockTransport";
-import { applyThemeTokens, createWidgetStyles } from "./styles";
-import { deepFreeze } from "./utils/deepFreeze";
-import { mergeConfig } from "./utils/mergeConfig";
-import { loadConfigFromScript } from "./utils/scriptConfig";
+import { DEFAULT_WELCOME_MESSAGE } from "./defaults.js";
+import { renderLandscapeLayout } from "./layouts/landscapeLayout.js";
+import { renderNormalLayout } from "./layouts/normalLayout.js";
+import { MockChatTransport } from "./mock/mockTransport.js";
+import { applyThemeTokens, createWidgetStyles } from "./styles.js";
+import { deepFreeze } from "./utils/deepFreeze.js";
+import { mergeConfig } from "./utils/mergeConfig.js";
+import { loadConfigFromScript } from "./utils/scriptConfig.js";
 function defaultIdFactory() {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
         return crypto.randomUUID();

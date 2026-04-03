@@ -1,5 +1,5 @@
-import { CORE_DEFAULT_CONFIG, MODE_DEFAULTS } from "../defaults";
-import { validateConfigInput, validateLifecycleMap, validatePartialTheme, validateResolvedConfig } from "./validateConfig";
+import { CORE_DEFAULT_CONFIG, MODE_DEFAULTS } from "../defaults.js";
+import { validateConfigInput, validateLifecycleMap, validatePartialTheme, validateResolvedConfig } from "./validateConfig.js";
 function cloneStringArray(value, fallback) {
     return Array.isArray(value) ? [...value] : [...fallback];
 }

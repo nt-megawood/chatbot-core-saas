@@ -1,4 +1,4 @@
-import { renderMessageList, renderModeToggle } from "./shared";
+import { renderMessageList, renderModeToggle } from "./shared.js";
 export function renderNormalLayout(messages, currentMode) {
     return `<section class="ccs-root ccs-layout-normal">
     <header class="ccs-header">
