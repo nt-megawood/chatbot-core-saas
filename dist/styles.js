@@ -7,6 +7,8 @@ function scopeSelector(scopeClass, selector) {
 export function createWidgetStyles(scopeClass) {
     const root = scopeSelector(scopeClass, ".ccs-root");
     const shell = scopeSelector(scopeClass, ".ccs-shell");
+    const normalShell = scopeSelector(scopeClass, ".ccs-layout-normal .ccs-shell");
+    const landscapeShell = scopeSelector(scopeClass, ".ccs-layout-landscape .ccs-shell");
     const shellOpen = scopeSelector(scopeClass, ".ccs-shell-open");
     const shellClosed = scopeSelector(scopeClass, ".ccs-shell-closed");
     const positionBottomRight = scopeSelector(scopeClass, ".ccs-pos-bottom-right");
@@ -24,14 +26,21 @@ export function createWidgetStyles(scopeClass) {
     const teaserClose = scopeSelector(scopeClass, ".ccs-teaser-close");
     const header = scopeSelector(scopeClass, ".ccs-header");
     const headerControls = scopeSelector(scopeClass, ".ccs-header-controls");
+    const headerActions = scopeSelector(scopeClass, ".ccs-header-actions");
+    const headerActionsDivider = scopeSelector(scopeClass, ".ccs-header-actions .ccs-icon-btn + .ccs-icon-btn");
     const iconButton = scopeSelector(scopeClass, ".ccs-icon-btn");
     const title = scopeSelector(scopeClass, ".ccs-title");
     const modeToggle = scopeSelector(scopeClass, ".ccs-mode-toggle");
     const modeButton = scopeSelector(scopeClass, ".ccs-mode-button");
+    const modeButtonDivider = scopeSelector(scopeClass, ".ccs-mode-toggle .ccs-mode-button + .ccs-mode-button");
     const body = scopeSelector(scopeClass, ".ccs-body");
     const message = scopeSelector(scopeClass, ".ccs-message");
     const metaRow = scopeSelector(scopeClass, ".ccs-meta-row");
     const metaTime = scopeSelector(scopeClass, ".ccs-meta-time");
+    const assistantActions = scopeSelector(scopeClass, ".ccs-assistant-actions");
+    const assistantActionButton = scopeSelector(scopeClass, ".ccs-assistant-action-btn");
+    const assistantActionButtonActive = scopeSelector(scopeClass, ".ccs-assistant-action-btn.ccs-assistant-action-active");
+    const assistantActionIcon = scopeSelector(scopeClass, ".ccs-assistant-action-btn svg");
     const bubble = scopeSelector(scopeClass, ".ccs-bubble");
     const bubbleMarkdown = scopeSelector(scopeClass, ".ccs-bubble-markdown");
     const bubblePlain = scopeSelector(scopeClass, ".ccs-bubble-plain");
@@ -43,28 +52,48 @@ export function createWidgetStyles(scopeClass) {
     const thinkingText = scopeSelector(scopeClass, ".ccs-thinking-text");
     const thinkingDots = scopeSelector(scopeClass, ".ccs-thinking-dots span");
     const footer = scopeSelector(scopeClass, ".ccs-footer");
+    const footerInputRow = scopeSelector(scopeClass, ".ccs-footer-input-row");
     const input = scopeSelector(scopeClass, ".ccs-input");
     const send = scopeSelector(scopeClass, ".ccs-send");
+    const sendLoading = scopeSelector(scopeClass, ".ccs-send.ccs-send-loading");
+    const sendSpinner = scopeSelector(scopeClass, ".ccs-send-spinner");
+    const sendIcon = scopeSelector(scopeClass, ".ccs-send-icon");
+    const visuallyHidden = scopeSelector(scopeClass, ".ccs-visually-hidden");
     const emptyState = scopeSelector(scopeClass, ".ccs-empty");
     const landscapeGrid = scopeSelector(scopeClass, ".ccs-landscape-grid");
+    const landscapeMain = scopeSelector(scopeClass, ".ccs-landscape-main");
+    const landscapeBody = scopeSelector(scopeClass, ".ccs-layout-landscape .ccs-body");
+    const landscapeActionGroup = scopeSelector(scopeClass, ".ccs-layout-landscape .ccs-action-group");
     const sidePanel = scopeSelector(scopeClass, ".ccs-side-panel");
     const sideTitle = scopeSelector(scopeClass, ".ccs-side-title");
     const sideCopy = scopeSelector(scopeClass, ".ccs-side-copy");
+    const sideCard = scopeSelector(scopeClass, ".ccs-side-card");
+    const sideStrong = scopeSelector(scopeClass, ".ccs-side-strong");
+    const sideLabel = scopeSelector(scopeClass, ".ccs-side-label");
+    const sideRow = scopeSelector(scopeClass, ".ccs-side-row");
+    const sideInput = scopeSelector(scopeClass, ".ccs-side-input");
+    const sideHint = scopeSelector(scopeClass, ".ccs-side-hint");
+    const sideStatus = scopeSelector(scopeClass, ".ccs-side-status");
+    const sideStatusError = scopeSelector(scopeClass, ".ccs-side-status.ccs-side-status-error");
+    const sideStatusSuccess = scopeSelector(scopeClass, ".ccs-side-status.ccs-side-status-success");
+    const sideActions = scopeSelector(scopeClass, ".ccs-side-actions");
+    const sideButton = scopeSelector(scopeClass, ".ccs-side-button");
+    const sideButtonPrimary = scopeSelector(scopeClass, ".ccs-side-button.ccs-side-button-primary");
     return `
 ${root} {
   --ccs-color-surface: #ffffff;
-  --ccs-color-panel: #f6f8fb;
-  --ccs-color-primary: #1f6feb;
-  --ccs-color-text: #101828;
-  --ccs-color-muted-text: #475467;
-  --ccs-color-border: #d0d5dd;
-  --ccs-border-radius: 12px;
+  --ccs-color-panel: #fafafa;
+  --ccs-color-primary: #4b5563;
+  --ccs-color-text: #333333;
+  --ccs-color-muted-text: #666666;
+  --ccs-color-border: #dddddd;
+  --ccs-border-radius: 16px;
   --ccs-spacing: 12px;
   --ccs-widget-width: 400px;
   --ccs-widget-height: 640px;
   --ccs-widget-width-landscape: 860px;
   --ccs-widget-height-landscape: 540px;
-  --ccs-shadow: 0 10px 28px rgba(9, 20, 48, 0.2);
+  --ccs-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   color: var(--ccs-color-text);
   font-family: var(--ccs-font-family, system-ui, sans-serif);
   pointer-events: none;
@@ -82,7 +111,6 @@ ${shell} {
   width: var(--ccs-widget-width);
   height: var(--ccs-widget-height);
   background: var(--ccs-color-surface);
-  border: 1px solid var(--ccs-color-border);
   border-radius: var(--ccs-border-radius);
   box-shadow: var(--ccs-shadow);
   color: var(--ccs-color-text);
@@ -90,7 +118,8 @@ ${shell} {
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transform: translateY(0);
+  transition: transform 0.3s ease-in-out, opacity 0.3s;
 }
 
 ${shellOpen} {
@@ -100,7 +129,7 @@ ${shellOpen} {
 
 ${shellClosed} {
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(20px);
   pointer-events: none;
 }
 
@@ -109,8 +138,8 @@ ${toggle} {
   height: 60px;
   border-radius: 999px;
   border: 0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-  background: linear-gradient(160deg, var(--ccs-color-primary), #1546a0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: var(--ccs-color-primary);
   color: #ffffff;
   font-size: 24px;
   cursor: pointer;
@@ -121,12 +150,11 @@ ${toggleHidden} {
 }
 
 ${teaser} {
-  width: min(280px, 90vw);
+  width: min(260px, 90vw);
   background: var(--ccs-color-surface);
-  border: 1px solid var(--ccs-color-border);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(5, 18, 42, 0.2);
-  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  padding: 14px 16px 12px;
 }
 
 ${teaserOpen} {
@@ -144,30 +172,35 @@ ${teaserOpen} {
 ${teaserClose} {
   background: transparent;
   border: 0;
-  color: var(--ccs-color-muted-text);
+  color: #999999;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   padding: 0;
   position: absolute;
-  right: 12px;
+  right: 10px;
   top: 8px;
+}
+
+${teaserClose}:hover {
+  color: var(--ccs-color-text);
 }
 
 ${header} {
   align-items: center;
   border-bottom: 1px solid var(--ccs-color-border);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-shrink: 0;
   justify-content: space-between;
-  min-height: 68px;
-  padding: 12px 14px;
+  min-height: 72px;
+  padding: var(--ccs-spacing) calc(var(--ccs-spacing) + 4px);
 }
 
 ${title} {
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
   margin: 0;
 }
 
@@ -177,21 +210,46 @@ ${headerControls} {
   gap: 8px;
 }
 
-${modeToggle} {
+${headerActions} {
+  align-items: center;
+  border: 1.5px solid var(--ccs-color-primary);
+  border-radius: 20px;
   display: inline-flex;
-  border: 1px solid var(--ccs-color-border);
-  border-radius: 999px;
+  overflow: hidden;
+}
+
+${headerActionsDivider} {
+  border-left: 1.5px solid var(--ccs-color-primary);
+}
+
+${modeToggle} {
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid var(--ccs-color-primary);
+  border-radius: 20px;
+  display: inline-flex;
   overflow: hidden;
 }
 
 ${modeButton} {
   background: #ffffff;
   border: 0;
-  color: var(--ccs-color-text);
+  color: var(--ccs-color-primary);
   cursor: pointer;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
   font-weight: 600;
-  padding: 6px 10px;
+  height: 28px;
+  line-height: 1;
+  padding: 0 10px;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+${modeButtonDivider} {
+  border-left: 1.5px solid var(--ccs-color-primary);
 }
 
 ${modeButton}[aria-pressed="true"] {
@@ -199,23 +257,36 @@ ${modeButton}[aria-pressed="true"] {
   color: #ffffff;
 }
 
+${modeButton}:not([aria-pressed="true"]):hover {
+  background: var(--ccs-color-primary);
+  color: #ffffff;
+}
+
 ${iconButton} {
   align-items: center;
   background: #ffffff;
-  border: 1px solid var(--ccs-color-border);
-  border-radius: 999px;
-  color: var(--ccs-color-text);
+  border: 0;
+  color: var(--ccs-color-primary);
   cursor: pointer;
   display: inline-flex;
-  font-size: 0.95rem;
-  height: 30px;
+  font-size: 15px;
+  height: 28px;
   justify-content: center;
-  width: 30px;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+  width: 32px;
 }
 
 ${iconButton}:hover {
-  border-color: var(--ccs-color-primary);
-  color: var(--ccs-color-primary);
+  background: var(--ccs-color-primary);
+  color: #ffffff;
+}
+
+${iconButton}:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ccs-color-primary) 55%, #ffffff 45%);
+  outline-offset: 1px;
 }
 
 ${body} {
@@ -223,26 +294,27 @@ ${body} {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--ccs-spacing);
   min-height: 0;
   overflow-y: auto;
-  padding: 14px;
+  padding: calc(var(--ccs-spacing) + 6px) calc(var(--ccs-spacing) + 4px);
 }
 
 ${message} {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 86%;
+  max-width: 80%;
 }
 
 ${bubble} {
   background: #ffffff;
-  border: 1px solid var(--ccs-color-border);
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(5, 18, 42, 0.08);
-  line-height: 1.45;
-  padding: 11px 12px;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: var(--ccs-color-text);
+  line-height: 1.4;
+  max-width: 100%;
+  padding: 14px 16px;
 }
 
 ${bubbleMarkdown} p {
@@ -254,8 +326,12 @@ ${bubbleMarkdown} p:last-child {
 }
 
 ${bubbleMarkdown} ul {
-  margin: 6px 0 0;
+  margin: 4px 0 8px;
   padding-left: 18px;
+}
+
+${bubbleMarkdown} li {
+  margin-bottom: 4px;
 }
 
 ${bubbleMarkdown} a {
@@ -273,9 +349,8 @@ ${userMessage} {
 }
 
 ${userMessage} ${bubble} {
-  background: var(--ccs-color-primary);
-  border-color: var(--ccs-color-primary);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--ccs-color-panel) 70%, #e0e0e0 30%);
+  color: var(--ccs-color-text);
 }
 
 ${assistantMessage} {
@@ -290,50 +365,109 @@ ${emptyState} {
 
 ${metaRow} {
   display: flex;
+  align-items: center;
   min-height: 14px;
 }
 
 ${metaTime} {
-  color: var(--ccs-color-muted-text);
+  color: #aaaaaa;
   font-size: 11px;
+}
+
+${assistantActions} {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+${assistantActionButton} {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #999999;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.16s ease;
+  user-select: none;
+  width: 24px;
+}
+
+${assistantActionIcon} {
+  fill: none;
+  height: 13px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 13px;
+}
+
+${assistantActionButton}:hover {
+  color: var(--ccs-color-primary);
+}
+
+${assistantActionButton}:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ccs-color-primary) 45%, #ffffff 55%);
+  outline-offset: 1px;
+}
+
+${assistantActionButtonActive} {
+  color: var(--ccs-color-primary);
 }
 
 ${actionGroup} {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
 }
 
 ${actionButton} {
   background: var(--ccs-color-primary);
   border: 0;
-  border-radius: 999px;
+  border-radius: 20px;
   color: #ffffff;
   cursor: pointer;
-  font-size: 12px;
-  padding: 7px 12px;
+  font-size: 14px;
+  min-width: 130px;
+  padding: 8px 18px;
+  text-align: center;
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
 ${actionButton}:hover {
-  opacity: 0.9;
+  background: color-mix(in srgb, var(--ccs-color-primary) 86%, #000000 14%);
 }
 
 ${thinking} {
   align-items: center;
   display: flex;
-  gap: 8px;
-  margin: 4px 0;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 2px 0;
 }
 
 ${thinkingText} {
-  color: var(--ccs-color-muted-text);
+  color: #c0c0c0;
+  display: inline-flex;
+  gap: 5px;
   font-size: 13px;
   font-style: italic;
+  user-select: none;
 }
 
 ${thinkingDots} {
   animation: ccs-thinking-dot 1.5s infinite ease-in-out;
-  background: #9ea8ba;
+  background: #c8c8c8;
   border-radius: 50%;
   display: inline-block;
   height: 4px;
@@ -351,73 +485,247 @@ ${thinkingDots}:nth-child(3) { animation-delay: 0.5s; }
 }
 
 ${footer} {
-  align-items: center;
   background: #ffffff;
-  border-top: 1px solid var(--ccs-color-border);
-  box-shadow: 0 -1px 2px rgba(16, 24, 40, 0.06);
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.1);
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  gap: 4px;
+  padding: calc(var(--ccs-spacing) - 2px) calc(var(--ccs-spacing) + 4px) calc(var(--ccs-spacing) - 4px);
+}
+
+${footerInputRow} {
+  align-items: center;
+  display: flex;
   gap: 8px;
-  padding: 12px;
+  width: 100%;
 }
 
 ${input} {
   background: #ffffff;
-  border: 1px solid var(--ccs-color-border);
-  border-radius: 18px;
+  border: 1px solid var(--ccs-color-primary);
+  border-radius: 22px;
+  box-sizing: border-box;
   color: var(--ccs-color-text);
   flex: 1;
-  font: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
   max-height: 120px;
-  min-height: 42px;
-  padding: 10px 12px;
+  min-height: 40px;
+  min-width: 0;
+  outline: none;
+  overflow-y: hidden;
+  padding: 10px 14px;
   resize: none;
+  transition: height 0.1s ease;
+}
+
+${input}::placeholder {
+  color: #aaaaaa;
+}
+
+${input}:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ccs-color-primary) 36%, #ffffff 64%);
+  outline-offset: 1px;
+}
+
+${input}:disabled {
+  background: color-mix(in srgb, var(--ccs-color-panel) 80%, #ffffff 20%);
+  cursor: not-allowed;
 }
 
 ${send} {
   background: var(--ccs-color-primary);
   border: 0;
-  border-radius: 999px;
+  border-radius: 50%;
   color: #ffffff;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  font-size: 16px;
   height: 38px;
-  min-width: 68px;
-  padding: 0 14px;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+}
+
+${send}:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+${sendIcon} {
+  font-size: 16px;
+  line-height: 1;
+}
+
+${sendSpinner} {
+  animation: ccs-send-spin 0.7s linear infinite;
+  border: 2px solid rgba(255, 255, 255, 0.36);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+${sendLoading} {
+  pointer-events: none;
+}
+
+@keyframes ccs-send-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+${visuallyHidden} {
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 ${landscapeGrid} {
-  display: grid;
-  gap: var(--ccs-spacing);
-  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
-  min-height: 0;
   flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+${landscapeMain} {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
 }
 
 ${sidePanel} {
-  background: #f6f8fc;
-  border: 1px solid var(--ccs-color-border);
-  border-radius: 12px;
+  background: #f5f5f5;
+  border-left: 1px solid #e2e2e2;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 12px 12px 12px 0;
+  gap: 12px;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 12px;
+  padding: 14px;
+  width: 250px;
 }
 
 ${sideTitle} {
-  font-size: 0.92rem;
+  color: var(--ccs-color-text);
+  font-size: 15px;
   font-weight: 600;
   margin: 0;
 }
 
 ${sideCopy} {
-  color: var(--ccs-color-muted-text);
-  font-size: 0.85rem;
+  color: #555555;
+  font-size: 13px;
+  line-height: 1.4;
   margin: 0;
+}
+
+${sideCard} {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+${sideStrong} {
+  color: var(--ccs-color-text);
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+${sideLabel} {
+  color: var(--ccs-color-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+${sideRow},
+${sideActions} {
+  display: flex;
+  gap: 8px;
+}
+
+${sideInput} {
+  background: #ffffff;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #333333;
+  flex: 1;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 8px 9px;
+  width: 100%;
+}
+
+${sideHint} {
+  color: #777777;
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+${sideStatus} {
+  color: #666666;
+  font-size: 11px;
+  margin: 0;
+  min-height: 16px;
+}
+
+${sideStatusError} {
+  color: #a3002c;
+}
+
+${sideStatusSuccess} {
+  color: #1e7a37;
+}
+
+${sideButton} {
+  background: #dddddd;
+  border: 0;
+  border-radius: 8px;
+  color: #666666;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+${sideButton}:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+${sideButtonPrimary} {
+  background: var(--ccs-color-primary);
+  color: #ffffff;
+}
+
+${landscapeBody} {
+  padding: 14px;
+}
+
+${landscapeActionGroup} {
+  justify-content: flex-start;
 }
 
 ${positionBottomRight} {
@@ -464,29 +772,160 @@ ${positionMiddleLeft} {
   transform: translateY(-50%);
 }
 
-${scopeSelector(scopeClass, ".ccs-layout-landscape .ccs-shell")} {
-  width: var(--ccs-widget-width-landscape);
-  height: var(--ccs-widget-height-landscape);
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-top-left")} {
+  top: 30px;
+  right: auto;
+  bottom: auto;
+  left: 30px;
+  transform: none;
 }
 
-@media (max-width: 820px) {
-  ${shell} {
-    height: min(var(--ccs-widget-height), 86vh);
-    width: min(var(--ccs-widget-width), 95vw);
-  }
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-top-center")} {
+  top: 30px;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
 
-  ${scopeSelector(scopeClass, ".ccs-layout-landscape .ccs-shell")} {
-    height: min(var(--ccs-widget-height-landscape), 88vh);
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-top-right")} {
+  top: 30px;
+  right: 30px;
+  bottom: auto;
+  left: auto;
+  transform: none;
+}
+
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-bottom-left")} {
+  top: auto;
+  right: auto;
+  bottom: 30px;
+  left: 30px;
+  transform: none;
+}
+
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-bottom-center")} {
+  top: auto;
+  right: auto;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-bottom-right")} {
+  top: auto;
+  right: 30px;
+  bottom: 30px;
+  left: auto;
+  transform: none;
+}
+
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-middle-left")} {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 30px;
+  transform: translateY(-50%);
+}
+
+${scopeSelector(scopeClass, ".ccs-toggle.ccs-pos-middle-right")} {
+  top: 50%;
+  right: 30px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-top-left")} {
+  top: 100px;
+  right: auto;
+  bottom: auto;
+  left: 20px;
+  transform: translateY(0);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-top-center")} {
+  top: 100px;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-top-right")} {
+  top: 100px;
+  right: 20px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(0);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-bottom-left")} {
+  top: auto;
+  right: auto;
+  bottom: 100px;
+  left: 20px;
+  transform: translateY(0);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-bottom-center")} {
+  top: auto;
+  right: auto;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-bottom-right")} {
+  top: auto;
+  right: 20px;
+  bottom: 100px;
+  left: auto;
+  transform: translateY(0);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-middle-left")} {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 20px;
+  transform: translateY(-50%);
+}
+
+${scopeSelector(scopeClass, ".ccs-teaser.ccs-pos-middle-right")} {
+  top: 50%;
+  right: 20px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%);
+}
+
+${landscapeShell} {
+  width: var(--ccs-widget-width-landscape);
+  height: var(--ccs-widget-height-landscape);
+  border-radius: 14px;
+}
+
+@media (max-width: 980px) {
+  ${landscapeShell} {
+    height: min(var(--ccs-widget-height-landscape), 86vh);
     width: min(var(--ccs-widget-width-landscape), 96vw);
   }
 
-  ${landscapeGrid} {
-    grid-template-columns: 1fr;
-    padding-bottom: 10px;
+  ${sidePanel} {
+    width: 210px;
   }
 
-  ${sidePanel} {
-    margin: 0 12px 12px;
+  ${sideRow},
+  ${sideActions} {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 820px) {
+  ${normalShell} {
+    height: min(var(--ccs-widget-height), 86vh);
+    width: min(var(--ccs-widget-width), 95vw);
   }
 }
 `;

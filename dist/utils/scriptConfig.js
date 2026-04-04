@@ -73,6 +73,13 @@ export function loadConfigFromScript(scriptElement, options = {}) {
     if (dataset.showRefreshButton !== undefined) {
         attributeConfig.showRefreshButton = parseBoolean(dataset.showRefreshButton, "script.dataset.showRefreshButton");
     }
+    if (dataset.locale || dataset.fallbackLocale) {
+        attributeConfig.i18n = {
+            ...(attributeConfig.i18n ?? {}),
+            ...(dataset.locale ? { locale: dataset.locale } : {}),
+            ...(dataset.fallbackLocale ? { fallbackLocale: dataset.fallbackLocale } : {})
+        };
+    }
     if (dataset.teaserEnabled !== undefined ||
         dataset.teaserDelayMs !== undefined ||
         dataset.teaserTitle !== undefined ||

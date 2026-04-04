@@ -1,0 +1,1 @@
+{"version":3,"file":"scriptConfig.d.ts","sourceRoot":"","sources":["../../src/utils/scriptConfig.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAU,WAAW,EAAE,MAAM,aAAa,CAAC;AAGvD,MAAM,WAAW,mBAAmB;IAClC,SAAS,CAAC,EAAE,MAAM,CAAC;IACnB,cAAc,CAAC,EAAE,MAAM,CAAC;CACzB;AA8CD,wBAAgB,oBAAoB,CAClC,aAAa,EAAE,iBAAiB,EAChC,OAAO,GAAE,mBAAwB,GAChC,WAAW,CA0Gb"}

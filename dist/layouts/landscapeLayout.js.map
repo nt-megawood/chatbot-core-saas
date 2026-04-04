@@ -1,0 +1,1 @@
+{"version":3,"file":"landscapeLayout.js","sourceRoot":"","sources":["../../src/layouts/landscapeLayout.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,kBAAkB,EAAE,MAAM,aAAa,CAAC;AAEjD,MAAM,UAAU,qBAAqB,CAAC,KAAsC;IAC1E,OAAO,kBAAkB,CAAC;QACxB,GAAG,KAAK;QACR,IAAI,EAAE,WAAW;KAClB,CAAC,CAAC;AACL,CAAC"}

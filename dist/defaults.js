@@ -1,3 +1,4 @@
+import { resolveI18nConfig } from "./i18n.js";
 export const DEFAULT_WELCOME_MESSAGE = "Welcome. How can I help you today?";
 export const DEFAULT_THINKING_MESSAGES = [
     "Thinking...",
@@ -8,11 +9,11 @@ export const CORE_DEFAULT_THEME = {
     name: "core-default",
     tokens: {
         colorSurface: "#ffffff",
-        colorPanel: "#f7f8fb",
-        colorPrimary: "#1c63d5",
-        colorText: "#162033",
-        colorMutedText: "#566176",
-        colorBorder: "#d8dfec",
+        colorPanel: "#fafafa",
+        colorPrimary: "#4b5563",
+        colorText: "#333333",
+        colorMutedText: "#666666",
+        colorBorder: "#dddddd",
         borderRadius: "16px",
         spacing: "12px"
     },
@@ -51,6 +52,7 @@ export const CORE_DEFAULT_CONFIG = {
         messages: DEFAULT_THINKING_MESSAGES,
         intervalMs: 2_000
     },
+    i18n: resolveI18nConfig(undefined),
     actionHandlers: {},
     lifecycle: {},
     useShadowDom: true
@@ -64,11 +66,11 @@ export const MODE_DEFAULTS = {
             name: "normal-default",
             tokens: {
                 colorSurface: "#ffffff",
-                colorPanel: "#f7f8fb",
-                colorPrimary: "#1c63d5",
-                colorText: "#162033",
-                colorMutedText: "#566176",
-                colorBorder: "#d8dfec",
+                colorPanel: "#fafafa",
+                colorPrimary: "#4b5563",
+                colorText: "#333333",
+                colorMutedText: "#666666",
+                colorBorder: "#dddddd",
                 borderRadius: "16px",
                 spacing: "12px"
             },
@@ -84,11 +86,11 @@ export const MODE_DEFAULTS = {
             name: "landscape-default",
             tokens: {
                 colorSurface: "#ffffff",
-                colorPanel: "#f1f5fc",
-                colorPrimary: "#0d5ac7",
-                colorText: "#132038",
-                colorMutedText: "#48566f",
-                colorBorder: "#c7d2e6",
+                colorPanel: "#f5f5f5",
+                colorPrimary: "#4b5563",
+                colorText: "#333333",
+                colorMutedText: "#666666",
+                colorBorder: "#dddddd",
                 borderRadius: "14px",
                 spacing: "12px"
             },

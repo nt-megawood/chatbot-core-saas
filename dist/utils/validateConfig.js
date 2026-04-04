@@ -13,8 +13,10 @@ const CONFIG_KEYS = new Set([
     "storage",
     "presence",
     "thinking",
+    "i18n",
     "actionHandlers",
     "lifecycle",
+    "landscapePanel",
     "resolveWelcomeMessage",
     "useShadowDom"
 ]);
@@ -37,7 +39,8 @@ const LIFECYCLE_KEYS = new Set([
     "onOpenChange",
     "onTeaser",
     "onPresence",
-    "onActionInvoked"
+    "onActionInvoked",
+    "onAssistantActionInvoked"
 ]);
 const TEASER_KEYS = new Set(["enabled", "delayMs", "title", "text"]);
 const STORAGE_KEYS = new Set([
@@ -53,7 +56,43 @@ const PRESENCE_KEYS = new Set([
     "pollWhenClosed"
 ]);
 const THINKING_KEYS = new Set(["messages", "intervalMs"]);
-const ACTION_HANDLER_KEYS = new Set(["sendMessage", "openUrl", "custom"]);
+const ACTION_HANDLER_KEYS = new Set([
+    "sendMessage",
+    "openUrl",
+    "custom",
+    "assistantAction"
+]);
+const LANDSCAPE_PANEL_KEYS = new Set(["render", "bind"]);
+const I18N_KEYS = new Set([
+    "locale",
+    "fallbackLocale",
+    "customTranslations",
+    "messages"
+]);
+const I18N_MESSAGE_KEYS = new Set([
+    "layoutModeSelectorAriaLabel",
+    "layoutModeNormalLabel",
+    "layoutModeLandscapeLabel",
+    "messageActionsAriaLabel",
+    "assistantActionsAriaLabel",
+    "assistantFeedbackUpAriaLabel",
+    "assistantFeedbackDownAriaLabel",
+    "assistantCopyAriaLabel",
+    "assistantCopiedAriaLabel",
+    "assistantSpeakAriaLabel",
+    "assistantStopSpeakAriaLabel",
+    "emptyMessageListText",
+    "landscapeSidebarTitle",
+    "landscapeSidebarLine1",
+    "landscapeSidebarLine2",
+    "teaserDismissAriaLabel",
+    "openChatAriaLabel",
+    "clearConversationTitle",
+    "closeChatTitle",
+    "inputAriaLabel",
+    "sendMessageAriaLabel",
+    "sendMessageLabel"
+]);
 const POSITION_VALUES = new Set([
     "bottom-right",
     "bottom-left",
@@ -72,7 +111,7 @@ function assertRecord(value, path) {
 function assertUnknownKeys(record, allowed, path) {
     for (const key of Object.keys(record)) {
         if (!allowed.has(key)) {
-            throw new Error(`Unknown key "${path}.${key}".`);
+            throw new Error(`Unknown key \"${path}.${key}\".`);
         }
     }
 }
@@ -180,6 +219,45 @@ function validateActionHandlersMap(value, path) {
         }
     }
 }
+function validateLandscapePanelInput(value, path) {
+    assertRecord(value, path);
+    assertUnknownKeys(value, LANDSCAPE_PANEL_KEYS, path);
+    if ("render" in value && value.render !== undefined && typeof value.render !== "function") {
+        throw new Error(`${path}.render must be a function when provided.`);
+    }
+    if ("bind" in value && value.bind !== undefined && typeof value.bind !== "function") {
+        throw new Error(`${path}.bind must be a function when provided.`);
+    }
+}
+function validateI18nMessages(value, path) {
+    assertRecord(value, path);
+    assertUnknownKeys(value, I18N_MESSAGE_KEYS, path);
+    for (const [key, message] of Object.entries(value)) {
+        assertString(message, `${path}.${key}`);
+    }
+}
+function validateI18nInput(value, path) {
+    assertRecord(value, path);
+    assertUnknownKeys(value, I18N_KEYS, path);
+    if ("locale" in value) {
+        assertString(value.locale, `${path}.locale`);
+    }
+    if ("fallbackLocale" in value) {
+        assertString(value.fallbackLocale, `${path}.fallbackLocale`);
+    }
+    if ("customTranslations" in value) {
+        assertRecord(value.customTranslations, `${path}.customTranslations`);
+        for (const [locale, messages] of Object.entries(value.customTranslations)) {
+            if (!locale.trim()) {
+                throw new Error(`${path}.customTranslations locale keys must not be empty.`);
+            }
+            validateI18nMessages(messages, `${path}.customTranslations.${locale}`);
+        }
+    }
+    if ("messages" in value) {
+        validateI18nMessages(value.messages, `${path}.messages`);
+    }
+}
 export function validatePartialTheme(value, path = "theme") {
     assertRecord(value, path);
     assertUnknownKeys(value, THEME_KEYS, path);
@@ -247,19 +325,25 @@ export function validateConfigInput(value, path = "config") {
     if ("thinking" in value) {
         validateThinkingInput(value.thinking, `${path}.thinking`);
     }
+    if ("i18n" in value) {
+        validateI18nInput(value.i18n, `${path}.i18n`);
+    }
     if ("actionHandlers" in value) {
         validateActionHandlersMap(value.actionHandlers, `${path}.actionHandlers`);
     }
     if ("lifecycle" in value) {
         validateLifecycleMap(value.lifecycle, `${path}.lifecycle`);
     }
+    if ("landscapePanel" in value && value.landscapePanel !== undefined) {
+        validateLandscapePanelInput(value.landscapePanel, `${path}.landscapePanel`);
+    }
     if ("resolveWelcomeMessage" in value) {
         if (typeof value.resolveWelcomeMessage !== "function") {
             throw new Error(`${path}.resolveWelcomeMessage must be a function when provided.`);
         }
     }
-    if ("useShadowDom" in value && typeof value.useShadowDom !== "boolean") {
-        throw new Error(`${path}.useShadowDom must be a boolean when provided.`);
+    if ("useShadowDom" in value) {
+        assertBoolean(value.useShadowDom, `${path}.useShadowDom`);
     }
 }
 export function validateResolvedConfig(config) {
@@ -270,20 +354,46 @@ export function validateResolvedConfig(config) {
     if (!config.socketUrl.trim()) {
         throw new Error("resolvedConfig.socketUrl cannot be empty.");
     }
-    for (const token of TOKEN_KEYS) {
-        const value = config.theme.tokens[token];
-        if (typeof value !== "string" || !value.trim()) {
-            throw new Error(`resolvedConfig.theme.tokens.${token} must be a non-empty string.`);
-        }
-    }
-    if (config.title.trim().length === 0) {
+    if (!config.title.trim()) {
         throw new Error("resolvedConfig.title cannot be empty.");
     }
-    if (!POSITION_VALUES.has(config.position)) {
-        throw new Error("resolvedConfig.position must be valid.");
+    if (!config.inputPlaceholder.trim()) {
+        throw new Error("resolvedConfig.inputPlaceholder cannot be empty.");
+    }
+    if (!config.storage.key.trim()) {
+        throw new Error("resolvedConfig.storage.key cannot be empty.");
+    }
+    if (!config.i18n.locale.trim()) {
+        throw new Error("resolvedConfig.i18n.locale cannot be empty.");
+    }
+    if (!config.i18n.fallbackLocale.trim()) {
+        throw new Error("resolvedConfig.i18n.fallbackLocale cannot be empty.");
+    }
+    if (!Number.isFinite(config.storage.maxMessages) || config.storage.maxMessages < 1) {
+        throw new Error("resolvedConfig.storage.maxMessages must be >= 1.");
+    }
+    if (!Number.isFinite(config.presence.intervalMs) || config.presence.intervalMs < 1000) {
+        throw new Error("resolvedConfig.presence.intervalMs must be >= 1000.");
+    }
+    if (!Number.isFinite(config.teaser.delayMs) || config.teaser.delayMs < 0) {
+        throw new Error("resolvedConfig.teaser.delayMs must be >= 0.");
+    }
+    if (!Number.isFinite(config.thinking.intervalMs) || config.thinking.intervalMs < 200) {
+        throw new Error("resolvedConfig.thinking.intervalMs must be >= 200.");
     }
     if (!Array.isArray(config.thinking.messages) || config.thinking.messages.length === 0) {
         throw new Error("resolvedConfig.thinking.messages must contain at least one entry.");
+    }
+    for (const message of config.thinking.messages) {
+        if (typeof message !== "string" || !message.trim()) {
+            throw new Error("resolvedConfig.thinking.messages entries must be non-empty strings.");
+        }
+    }
+    for (const token of TOKEN_KEYS) {
+        const tokenValue = config.theme.tokens[token];
+        if (typeof tokenValue !== "string" || !tokenValue.trim()) {
+            throw new Error(`resolvedConfig.theme.tokens.${token} must be a non-empty string.`);
+        }
     }
 }
 //# sourceMappingURL=validateConfig.js.map

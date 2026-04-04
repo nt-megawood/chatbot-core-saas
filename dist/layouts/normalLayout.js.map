@@ -1,0 +1,1 @@
+{"version":3,"file":"normalLayout.js","sourceRoot":"","sources":["../../src/layouts/normalLayout.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,kBAAkB,EAAE,MAAM,aAAa,CAAC;AAEjD,MAAM,UAAU,kBAAkB,CAAC,KAAsC;IACvE,OAAO,kBAAkB,CAAC;QACxB,GAAG,KAAK;QACR,IAAI,EAAE,QAAQ;KACf,CAAC,CAAC;AACL,CAAC"}

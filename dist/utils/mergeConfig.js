@@ -1,5 +1,6 @@
 import { CORE_DEFAULT_CONFIG, MODE_DEFAULTS } from "../defaults.js";
 import { validateConfigInput, validateLifecycleMap, validatePartialTheme, validateResolvedConfig } from "./validateConfig.js";
+import { resolveI18nConfig } from "../i18n.js";
 function cloneStringArray(value, fallback) {
     return Array.isArray(value) ? [...value] : [...fallback];
 }
@@ -51,6 +52,9 @@ function mergeThinking(input) {
         messages: cloneStringArray(input?.messages, CORE_DEFAULT_CONFIG.thinking.messages)
     };
 }
+function mergeI18n(input) {
+    return resolveI18nConfig(input);
+}
 function mergeActionHandlers(input) {
     return {
         ...CORE_DEFAULT_CONFIG.actionHandlers,
@@ -78,6 +82,7 @@ export function mergeConfig(initConfig, options = {}) {
         storage: mergeStorage(initConfig.storage),
         presence: mergePresence(initConfig.presence),
         thinking: mergeThinking(initConfig.thinking),
+        i18n: mergeI18n(initConfig.i18n),
         actionHandlers: mergeActionHandlers(initConfig.actionHandlers),
         lifecycle: mergedLifecycle
     };

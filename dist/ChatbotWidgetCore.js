@@ -42,9 +42,14 @@ export class ChatbotWidgetCore {
     teaserTimeoutId = null;
     thinkingIntervalId = null;
     presenceIntervalId = null;
+    copyIndicatorTimeoutId = null;
     presenceInFlight = false;
+    landscapePanelCleanup = null;
     visibilityListener = null;
     focusListener = null;
+    assistantFeedbackByMessageId = new Map();
+    copiedMessageId = null;
+    speakingMessageId = null;
     static fromScript(scriptElement, options = {}) {
         const scriptConfig = loadConfigFromScript(scriptElement);
         return new ChatbotWidgetCore(scriptConfig, options);
@@ -141,6 +146,7 @@ export class ChatbotWidgetCore {
     }
     clearConversation() {
         this.stopThinking();
+        this.resetAssistantMessageInteractions();
         this.messages = [];
         this.conversationId = null;
         this.presenceInFlight = false;
@@ -198,7 +204,10 @@ export class ChatbotWidgetCore {
             return;
         }
         this.clearTeaserTimer();
+        this.clearCopyIndicatorTimer();
         this.stopThinking();
+        this.stopSpeaking(false);
+        this.clearLandscapePanelCleanup();
         this.detachPresenceVisibilityHandlers();
         this.stopPresencePolling();
         if (this.usingShadowDom) {
@@ -382,6 +391,170 @@ export class ChatbotWidgetCore {
         }
         return normalized.length > 0 ? normalized : undefined;
     }
+    isAwaitingAssistantResponse() {
+        return this.messages.some((message) => message.role === "assistant" && (message.state === "pending" || message.state === "streaming"));
+    }
+    clearCopyIndicatorTimer() {
+        if (this.copyIndicatorTimeoutId === null) {
+            return;
+        }
+        window.clearTimeout(this.copyIndicatorTimeoutId);
+        this.copyIndicatorTimeoutId = null;
+    }
+    markMessageCopied(messageId) {
+        this.copiedMessageId = messageId;
+        this.clearCopyIndicatorTimer();
+        this.copyIndicatorTimeoutId = window.setTimeout(() => {
+            if (this.copiedMessageId === messageId) {
+                this.copiedMessageId = null;
+                this.render();
+            }
+            this.copyIndicatorTimeoutId = null;
+        }, 1_500);
+    }
+    supportsSpeechSynthesis() {
+        return typeof window !== "undefined" && "speechSynthesis" in window;
+    }
+    stopSpeaking(renderAfterStop = false) {
+        if (this.supportsSpeechSynthesis()) {
+            window.speechSynthesis.cancel();
+        }
+        const wasSpeaking = this.speakingMessageId !== null;
+        this.speakingMessageId = null;
+        if (renderAfterStop && wasSpeaking) {
+            this.render();
+        }
+    }
+    resetAssistantMessageInteractions() {
+        this.assistantFeedbackByMessageId.clear();
+        this.copiedMessageId = null;
+        this.clearCopyIndicatorTimer();
+        this.stopSpeaking(false);
+    }
+    buildAssistantActionStateByMessageId() {
+        const stateByMessageId = {};
+        for (const message of this.messages) {
+            if (message.role !== "assistant") {
+                continue;
+            }
+            stateByMessageId[message.id] = {
+                feedback: this.assistantFeedbackByMessageId.get(message.id) ?? null,
+                copied: this.copiedMessageId === message.id,
+                speaking: this.speakingMessageId === message.id
+            };
+        }
+        return stateByMessageId;
+    }
+    resolveAssistantActionState(messageId) {
+        return {
+            feedback: this.assistantFeedbackByMessageId.get(messageId) ?? null,
+            copied: this.copiedMessageId === messageId,
+            speaking: this.speakingMessageId === messageId
+        };
+    }
+    setFeedbackState(messageId, requestedFeedback) {
+        const previous = this.assistantFeedbackByMessageId.get(messageId) ?? null;
+        const next = previous === requestedFeedback ? null : requestedFeedback;
+        if (next === null) {
+            this.assistantFeedbackByMessageId.delete(messageId);
+            return;
+        }
+        this.assistantFeedbackByMessageId.set(messageId, next);
+    }
+    async copyMessageText(text) {
+        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+            catch {
+                // Fall back to a temporary textarea for browsers that block async clipboard writes.
+            }
+        }
+        if (typeof document === "undefined") {
+            return false;
+        }
+        const tempTextArea = document.createElement("textarea");
+        tempTextArea.value = text;
+        tempTextArea.setAttribute("readonly", "readonly");
+        tempTextArea.style.position = "absolute";
+        tempTextArea.style.left = "-9999px";
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        try {
+            return document.execCommand("copy");
+        }
+        catch {
+            return false;
+        }
+        finally {
+            tempTextArea.remove();
+        }
+    }
+    toggleSpeechForMessage(message) {
+        if (!this.supportsSpeechSynthesis()) {
+            return;
+        }
+        if (this.speakingMessageId === message.id) {
+            this.stopSpeaking(false);
+            return;
+        }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(message.text);
+        this.speakingMessageId = message.id;
+        utterance.onend = () => {
+            if (this.speakingMessageId !== message.id) {
+                return;
+            }
+            this.speakingMessageId = null;
+            this.render();
+        };
+        utterance.onerror = () => {
+            if (this.speakingMessageId !== message.id) {
+                return;
+            }
+            this.speakingMessageId = null;
+            this.render();
+        };
+        window.speechSynthesis.speak(utterance);
+    }
+    async handleAssistantAction(action, sourceMessage) {
+        if (sourceMessage.role !== "assistant") {
+            return;
+        }
+        if (action === "feedback_up") {
+            this.setFeedbackState(sourceMessage.id, "up");
+        }
+        else if (action === "feedback_down") {
+            this.setFeedbackState(sourceMessage.id, "down");
+        }
+        else if (action === "copy") {
+            const copied = await this.copyMessageText(sourceMessage.text);
+            if (copied) {
+                this.markMessageCopied(sourceMessage.id);
+            }
+        }
+        else if (action === "speak") {
+            this.toggleSpeechForMessage(sourceMessage);
+        }
+        const context = {
+            action,
+            sourceMessage,
+            state: this.resolveAssistantActionState(sourceMessage.id),
+            widget: this.actionApi,
+            timestamp: this.now()
+        };
+        this.config.lifecycle.onAssistantActionInvoked?.({
+            action,
+            sourceMessage,
+            state: context.state,
+            timestamp: context.timestamp
+        });
+        this.render();
+        if (this.config.actionHandlers.assistantAction) {
+            await this.config.actionHandlers.assistantAction(context);
+        }
+    }
     hydrateFromStore() {
         if (!this.conversationStore) {
             return;
@@ -392,6 +565,7 @@ export class ChatbotWidgetCore {
         }
         this.conversationId = snapshot.conversationId;
         this.messages = snapshot.messages;
+        this.resetAssistantMessageInteractions();
         this.currentMode = snapshot.mode;
         this.teaserDismissed = snapshot.teaserDismissed;
         if (this.config.storage.persistOpenState) {
@@ -602,10 +776,56 @@ export class ChatbotWidgetCore {
             await this.config.actionHandlers.custom(context);
         }
     }
+    clearLandscapePanelCleanup() {
+        if (!this.landscapePanelCleanup) {
+            return;
+        }
+        this.landscapePanelCleanup();
+        this.landscapePanelCleanup = null;
+    }
+    createLandscapePanelRenderContext() {
+        return {
+            mode: this.currentMode,
+            isOpen: this.isOpen,
+            conversationId: this.conversationId,
+            messages: this.messages,
+            labels: this.config.i18n.messages
+        };
+    }
+    resolveLandscapePanelContent() {
+        const renderLandscapePanel = this.config.landscapePanel?.render;
+        if (!renderLandscapePanel || this.currentMode !== "landscape") {
+            return null;
+        }
+        const rendered = renderLandscapePanel(this.createLandscapePanelRenderContext());
+        return typeof rendered === "string" ? rendered : null;
+    }
+    bindLandscapePanel(rootElement) {
+        const bindLandscapePanel = this.config.landscapePanel?.bind;
+        if (!bindLandscapePanel || this.currentMode !== "landscape") {
+            return;
+        }
+        const panelElement = rootElement.querySelector("[data-landscape-panel]");
+        if (!panelElement) {
+            return;
+        }
+        const bindContext = {
+            ...this.createLandscapePanelRenderContext(),
+            rootElement,
+            panelElement,
+            widget: this.actionApi
+        };
+        const cleanup = bindLandscapePanel(bindContext);
+        if (typeof cleanup === "function") {
+            this.landscapePanelCleanup = cleanup;
+        }
+    }
     render() {
         if (!this.renderRoot) {
             return;
         }
+        this.clearLandscapePanelCleanup();
+        const inputBusy = this.isAwaitingAssistantResponse();
         const sharedLayoutState = {
             title: this.config.title,
             inputPlaceholder: this.config.inputPlaceholder,
@@ -617,8 +837,13 @@ export class ChatbotWidgetCore {
             teaserTitle: this.config.teaser.title,
             teaserText: this.config.teaser.text,
             messages: this.messages,
+            assistantActionStateByMessageId: this.buildAssistantActionStateByMessageId(),
             isThinking: this.isThinking,
-            thinkingText: this.thinkingText
+            thinkingText: this.thinkingText,
+            isInputDisabled: inputBusy,
+            isSendLoading: inputBusy,
+            landscapePanelContent: this.resolveLandscapePanelContent(),
+            labels: this.config.i18n.messages
         };
         const layout = this.currentMode === "landscape"
             ? renderLandscapeLayout(sharedLayoutState)
@@ -631,6 +856,7 @@ export class ChatbotWidgetCore {
         }
         applyThemeTokens(rootElement, this.config.theme.tokens, this.config.theme.fontFamilies);
         this.bindUi(rootElement);
+        this.bindLandscapePanel(rootElement);
         const messageContainer = rootElement.querySelector("[data-chat-messages]");
         if (messageContainer) {
             messageContainer.scrollTop = messageContainer.scrollHeight;
@@ -672,6 +898,25 @@ export class ChatbotWidgetCore {
                 void this.handleAction(action, sourceMessage).catch(() => undefined);
             });
         });
+        const assistantActionButtons = rootElement.querySelectorAll("[data-assistant-action-message-id][data-assistant-action]");
+        assistantActionButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                const messageId = button.dataset.assistantActionMessageId;
+                const assistantAction = button.dataset.assistantAction;
+                if (!messageId ||
+                    (assistantAction !== "feedback_up" &&
+                        assistantAction !== "feedback_down" &&
+                        assistantAction !== "copy" &&
+                        assistantAction !== "speak")) {
+                    return;
+                }
+                const sourceMessage = this.messages.find((message) => message.id === messageId);
+                if (!sourceMessage) {
+                    return;
+                }
+                void this.handleAssistantAction(assistantAction, sourceMessage).catch(() => undefined);
+            });
+        });
         const form = rootElement.querySelector("[data-chat-form]");
         const input = rootElement.querySelector("[data-chat-input]");
         if (!form || !input) {
@@ -681,16 +926,26 @@ export class ChatbotWidgetCore {
             input.style.height = "auto";
             input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
         };
+        const canSubmit = () => !input.disabled && !this.isAwaitingAssistantResponse();
         input.addEventListener("input", autoResize);
         input.addEventListener("keydown", (event) => {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
+                if (!canSubmit()) {
+                    return;
+                }
                 form.requestSubmit();
             }
         });
         form.addEventListener("submit", (event) => {
             event.preventDefault();
-            const value = input.value;
+            if (!canSubmit()) {
+                return;
+            }
+            const value = input.value.trim();
+            if (!value) {
+                return;
+            }
             input.value = "";
             input.style.height = "auto";
             void this.sendMessage(value).catch(() => undefined);
