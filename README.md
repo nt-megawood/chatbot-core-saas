@@ -90,6 +90,7 @@ Then import the core directly in your page:
 | `storage` | `StorageConfig` | core storage | Local conversation persistence.
 | `presence` | `PresenceConfig` | core presence | Presence polling configuration.
 | `thinking` | `ThinkingConfig` | core thinking | Thinking text rotation and interval.
+| `i18n` | `I18nConfigInput` | core i18n | Locale and custom translation overrides for shell labels.
 | `actionHandlers` | `ActionHandlers` | `{}` | Custom action handlers for assistant actions.
 | `lifecycle` | `LifecycleHooks` | `{}` | Widget lifecycle callbacks.
 | `resolveWelcomeMessage` | `(context) => string` | fallback welcome text | Override the welcome message.
@@ -166,6 +167,48 @@ thinking: {
   intervalMs: 2000
 }
 ```
+
+### i18n options
+
+Built-in locales: `en`, `de`.
+
+```ts
+i18n: {
+  locale: "de",
+  fallbackLocale: "en",
+  customTranslations: {
+    de: {
+      openChatAriaLabel: "Chat oeffnen",
+      closeChatTitle: "Chat schliessen",
+      clearConversationTitle: "Gespraech neu starten",
+      inputAriaLabel: "Nachricht eingeben",
+      sendMessageAriaLabel: "Senden",
+      sendMessageLabel: "Senden"
+    },
+    fr: {
+      sendMessageLabel: "Envoyer"
+    }
+  }
+}
+```
+
+Available translation keys:
+
+- `layoutModeSelectorAriaLabel`
+- `layoutModeNormalLabel`
+- `layoutModeLandscapeLabel`
+- `messageActionsAriaLabel`
+- `emptyMessageListText`
+- `landscapeSidebarTitle`
+- `landscapeSidebarLine1`
+- `landscapeSidebarLine2`
+- `teaserDismissAriaLabel`
+- `openChatAriaLabel`
+- `clearConversationTitle`
+- `closeChatTitle`
+- `inputAriaLabel`
+- `sendMessageAriaLabel`
+- `sendMessageLabel`
 
 ### Action handlers
 
@@ -254,7 +297,13 @@ You can also load config from a script element:
 <script
   src="https://nt-megawood.github.io/chatbot-core-saas/index.js"
   type="module"
-  data-chatbot-config='{\n    "mode": "normal",\n    "apiEndpoint": "https://example.com/api/chat",\n    "socketUrl": "wss://example.com/socket",\n    "title": "Support",\n    "position": "bottom-right"\n  }'
+  data-chatbot-config='{
+    "mode": "normal",
+    "apiEndpoint": "https://example.com/api/chat",
+    "socketUrl": "wss://example.com/socket",
+    "title": "Support",
+    "position": "bottom-right"
+  }'
 ></script>
 ```
 
