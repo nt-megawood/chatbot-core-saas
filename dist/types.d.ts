@@ -109,6 +109,11 @@ export interface LandscapePanelConfig {
     render?: (context: LandscapePanelRenderContext) => string;
     bind?: (context: LandscapePanelBindContext) => void | (() => void);
 }
+export interface MessageSourceLink {
+    url: string;
+    label?: string;
+    title?: string;
+}
 export interface I18nConfigInput {
     locale?: string;
     fallbackLocale?: string;
@@ -126,6 +131,46 @@ export interface WidgetActionApi {
     close: () => void;
     toggle: () => void;
     clearConversation: () => void;
+}
+export interface RenderHooksSharedContext {
+    mode: WidgetMode;
+    isOpen: boolean;
+    conversationId: string | null;
+    messages: readonly Message[];
+    labels: I18nMessages;
+    title: string;
+    inputPlaceholder: string;
+    positionClass: string;
+    allowRuntimeModeSwitch: boolean;
+    showRefreshButton: boolean;
+    teaserTitle: string;
+    teaserText: string;
+    isThinking: boolean;
+    thinkingText: string;
+    isInputDisabled: boolean;
+    isSendLoading: boolean;
+}
+export interface MessageRenderContext extends RenderHooksSharedContext {
+    message: Message;
+    messageIndex: number;
+    assistantActionState?: AssistantMessageActionState;
+}
+export interface InputCardRenderContext extends RenderHooksSharedContext {
+    latestAssistantMessage: Message | null;
+}
+export interface RenderHooksBindContext extends RenderHooksSharedContext {
+    rootElement: HTMLElement;
+    widget: WidgetActionApi;
+}
+export interface RenderHooksConfig {
+    renderHeader?: (context: RenderHooksSharedContext) => string;
+    renderToggle?: (context: RenderHooksSharedContext) => string;
+    renderTeaser?: (context: RenderHooksSharedContext) => string;
+    renderMessageMeta?: (context: MessageRenderContext) => string;
+    renderMessageFooter?: (context: MessageRenderContext) => string;
+    renderFooterMeta?: (context: RenderHooksSharedContext) => string;
+    renderInputCard?: (context: InputCardRenderContext) => string;
+    bind?: (context: RenderHooksBindContext) => void | (() => void);
 }
 export interface ActionExecutionContext {
     action: MessageAction;
@@ -230,10 +275,11 @@ export interface Config {
     actionHandlers: ActionHandlers;
     lifecycle: LifecycleHooks;
     landscapePanel?: LandscapePanelConfig;
+    renderHooks: RenderHooksConfig;
     resolveWelcomeMessage?: (context: WelcomeMessageContext) => string;
     useShadowDom?: boolean;
 }
-export interface ConfigInput extends Partial<Omit<Config, "theme" | "teaser" | "storage" | "presence" | "thinking" | "i18n" | "actionHandlers" | "lifecycle">> {
+export interface ConfigInput extends Partial<Omit<Config, "theme" | "teaser" | "storage" | "presence" | "thinking" | "i18n" | "actionHandlers" | "lifecycle" | "renderHooks">> {
     theme?: ThemeInput;
     teaser?: Partial<TeaserConfig>;
     storage?: Partial<StorageConfig>;
@@ -242,6 +288,7 @@ export interface ConfigInput extends Partial<Omit<Config, "theme" | "teaser" | "
     i18n?: I18nConfigInput;
     actionHandlers?: Partial<ActionHandlers>;
     lifecycle?: Partial<LifecycleHooks>;
+    renderHooks?: Partial<RenderHooksConfig>;
 }
 export interface TransportRequest {
     message: Message;

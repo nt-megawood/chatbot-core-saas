@@ -1,6 +1,7 @@
-import type { AssistantMessageActionState, I18nMessages, Message, WidgetMode } from "../types.js";
+import type { AssistantMessageActionState, I18nMessages, Message, RenderHooksConfig, WidgetMode } from "../types.js";
 export interface LayoutRenderState {
     mode: WidgetMode;
+    conversationId: string | null;
     title: string;
     inputPlaceholder: string;
     positionClass: string;
@@ -18,6 +19,7 @@ export interface LayoutRenderState {
     isSendLoading: boolean;
     landscapePanelContent: string | null;
     labels: I18nMessages;
+    renderHooks: RenderHooksConfig;
 }
 export declare function renderWidgetLayout(state: LayoutRenderState): string;
 //# sourceMappingURL=shared.d.ts.map

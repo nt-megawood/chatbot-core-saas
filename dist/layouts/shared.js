@@ -13,6 +13,37 @@ function formatTimestamp(createdAt) {
         minute: "2-digit"
     });
 }
+function resolveRenderedMarkup(markup) {
+    return typeof markup === "string" ? markup : null;
+}
+function createRenderHooksSharedContext(state) {
+    return {
+        mode: state.mode,
+        isOpen: state.isOpen,
+        conversationId: state.conversationId,
+        messages: state.messages,
+        labels: state.labels,
+        title: state.title,
+        inputPlaceholder: state.inputPlaceholder,
+        positionClass: state.positionClass,
+        allowRuntimeModeSwitch: state.allowRuntimeModeSwitch,
+        showRefreshButton: state.showRefreshButton,
+        teaserTitle: state.teaserTitle,
+        teaserText: state.teaserText,
+        isThinking: state.isThinking,
+        thinkingText: state.thinkingText,
+        isInputDisabled: state.isInputDisabled,
+        isSendLoading: state.isSendLoading
+    };
+}
+function createMessageRenderContext(state, message, messageIndex, assistantActionState) {
+    return {
+        ...createRenderHooksSharedContext(state),
+        message,
+        messageIndex,
+        assistantActionState
+    };
+}
 function renderModeToggle(currentMode, labels) {
     return `<div class="ccs-mode-toggle" aria-label="${escapeHtml(labels.layoutModeSelectorAriaLabel)}">
     <button type="button" class="ccs-mode-button" data-set-mode="normal" aria-pressed="${currentMode === "normal"}">${escapeHtml(labels.layoutModeNormalLabel)}</button>
@@ -94,28 +125,106 @@ function renderAssistantActionToolbar(message, labels, actionState) {
     >${iconSpeak()}</button>
   </div>`;
 }
-function renderMessage(message, labels, actionStateByMessageId) {
+function asRecord(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+    return value;
+}
+function normalizeSourceLink(input) {
+    if (typeof input === "string") {
+        const trimmed = input.trim();
+        if (!trimmed || !/^https?:\/\//i.test(trimmed)) {
+            return null;
+        }
+        return {
+            url: trimmed,
+            label: trimmed
+        };
+    }
+    const record = asRecord(input);
+    if (!record) {
+        return null;
+    }
+    const rawUrl = typeof record.url === "string"
+        ? record.url
+        : typeof record.href === "string"
+            ? record.href
+            : "";
+    const url = rawUrl.trim();
+    if (!url || !/^https?:\/\//i.test(url)) {
+        return null;
+    }
+    const rawLabel = typeof record.label === "string"
+        ? record.label
+        : typeof record.title === "string"
+            ? record.title
+            : url;
+    return {
+        url,
+        label: rawLabel.trim() || url
+    };
+}
+function extractSourceLinks(message) {
+    const metadata = asRecord(message.metadata);
+    if (!metadata) {
+        return [];
+    }
+    const sources = metadata.sources;
+    if (!Array.isArray(sources)) {
+        return [];
+    }
+    const links = [];
+    for (const entry of sources) {
+        const normalized = normalizeSourceLink(entry);
+        if (normalized) {
+            links.push(normalized);
+        }
+    }
+    return links;
+}
+function renderMessageSources(message) {
+    const links = extractSourceLinks(message);
+    if (links.length === 0) {
+        return "";
+    }
+    const items = links
+        .map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`)
+        .join("");
+    return `<div class="ccs-message-sources" data-message-sources>
+    <span class="ccs-message-sources-label">Sources</span>
+    ${items}
+  </div>`;
+}
+function renderMessage(state, message, messageIndex) {
     const roleClass = message.role === "user" ? "ccs-message-user" : "ccs-message-assistant";
     const stateClass = `ccs-message-state-${message.state}`;
-    const assistantActionToolbar = renderAssistantActionToolbar(message, labels, actionStateByMessageId[message.id]);
+    const assistantActionState = state.assistantActionStateByMessageId[message.id];
+    const renderContext = createMessageRenderContext(state, message, messageIndex, assistantActionState);
+    const assistantActionToolbar = renderAssistantActionToolbar(message, state.labels, assistantActionState);
+    const customMetaMarkup = resolveRenderedMarkup(state.renderHooks.renderMessageMeta?.(renderContext));
+    const customFooterMarkup = resolveRenderedMarkup(state.renderHooks.renderMessageFooter?.(renderContext));
+    const messageMetaMarkup = customMetaMarkup ?? `<span class="ccs-meta-time">${formatTimestamp(message.createdAt)}</span>`;
+    const messageFooterMarkup = `${renderMessageSources(message)}${customFooterMarkup ?? ""}`;
     const content = message.role === "assistant"
         ? `<div class="ccs-bubble-markdown">${renderMarkdown(message.text)}</div>`
         : `<div class="ccs-bubble-plain">${escapeHtml(message.text).replaceAll("\n", "<br>")}</div>`;
     return `<article class="ccs-message ${roleClass} ${stateClass}" data-message-id="${message.id}">
     <div class="ccs-bubble">${content}</div>
     <div class="ccs-meta-row">
-      <span class="ccs-meta-time">${formatTimestamp(message.createdAt)}</span>
+      ${messageMetaMarkup}
     </div>
+    ${messageFooterMarkup}
     ${assistantActionToolbar}
-    ${renderMessageActions(message, labels)}
+    ${renderMessageActions(message, state.labels)}
   </article>`;
 }
-function renderMessageList(messages, labels, actionStateByMessageId) {
-    if (messages.length === 0) {
-        return `<p class="ccs-empty">${escapeHtml(labels.emptyMessageListText)}</p>`;
+function renderMessageList(state) {
+    if (state.messages.length === 0) {
+        return `<p class="ccs-empty">${escapeHtml(state.labels.emptyMessageListText)}</p>`;
     }
-    return messages
-        .map((message) => renderMessage(message, labels, actionStateByMessageId))
+    return state.messages
+        .map((message, messageIndex) => renderMessage(state, message, messageIndex))
         .join("");
 }
 function renderThinkingIndicator(thinkingText) {
@@ -124,10 +233,36 @@ function renderThinkingIndicator(thinkingText) {
     <span class="ccs-thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
   </div>`;
 }
+function findLatestAssistantMessage(messages) {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+        if (message?.role === "assistant") {
+            return message;
+        }
+    }
+    return null;
+}
+function renderInputCard(state) {
+    const renderInputCardHook = state.renderHooks.renderInputCard;
+    if (!renderInputCardHook) {
+        return "";
+    }
+    const context = {
+        ...createRenderHooksSharedContext(state),
+        latestAssistantMessage: findLatestAssistantMessage(state.messages)
+    };
+    const rendered = resolveRenderedMarkup(renderInputCardHook(context));
+    return rendered ?? "";
+}
 function renderMessageStream(state) {
-    return `${renderMessageList(state.messages, state.labels, state.assistantActionStateByMessageId)}${state.isThinking ? renderThinkingIndicator(state.thinkingText) : ""}`;
+    const inputCardMarkup = renderInputCard(state);
+    return `${renderMessageList(state)}${state.isThinking ? renderThinkingIndicator(state.thinkingText) : ""}${inputCardMarkup}`;
 }
 function renderHeader(state) {
+    const customMarkup = resolveRenderedMarkup(state.renderHooks.renderHeader?.(createRenderHooksSharedContext(state)));
+    if (customMarkup !== null) {
+        return customMarkup;
+    }
     return `<header class="ccs-header">
     <h2 class="ccs-title">${escapeHtml(state.title)}</h2>
     <div class="ccs-header-controls">
@@ -139,8 +274,13 @@ function renderHeader(state) {
     </div>
   </header>`;
 }
+function renderFooterMeta(state) {
+    const rendered = resolveRenderedMarkup(state.renderHooks.renderFooterMeta?.(createRenderHooksSharedContext(state)));
+    return rendered ?? "";
+}
 function renderFooter(state) {
     const inputDisabledAttribute = state.isInputDisabled ? " disabled" : "";
+    const footerMetaMarkup = renderFooterMeta(state);
     return `<form class="ccs-footer" data-chat-form>
     <div class="ccs-footer-input-row">
       <textarea
@@ -162,12 +302,33 @@ function renderFooter(state) {
         <span class="ccs-visually-hidden">${escapeHtml(state.labels.sendMessageLabel)}</span>
       </button>
     </div>
+    ${footerMetaMarkup}
   </form>`;
 }
 function renderDefaultLandscapePanel(state) {
     return `<h3 class="ccs-side-title">${escapeHtml(state.labels.landscapeSidebarTitle)}</h3>
     <p class="ccs-side-copy">${escapeHtml(state.labels.landscapeSidebarLine1)}</p>
     <p class="ccs-side-copy">${escapeHtml(state.labels.landscapeSidebarLine2)}</p>`;
+}
+function renderToggle(state) {
+    const customMarkup = resolveRenderedMarkup(state.renderHooks.renderToggle?.(createRenderHooksSharedContext(state)));
+    if (customMarkup !== null) {
+        return customMarkup;
+    }
+    return `<button type="button" class="ccs-toggle ${state.positionClass}${state.isOpen ? " ccs-toggle-hidden" : ""}" data-toggle-open aria-label="${escapeHtml(state.labels.openChatAriaLabel)}">&#128172;</button>`;
+}
+function renderTeaser(state) {
+    const customMarkup = resolveRenderedMarkup(state.renderHooks.renderTeaser?.(createRenderHooksSharedContext(state)));
+    if (customMarkup !== null) {
+        return customMarkup;
+    }
+    return `<section class="ccs-teaser ${state.positionClass}" data-teaser>
+    <button type="button" class="ccs-teaser-close" data-dismiss-teaser aria-label="${escapeHtml(state.labels.teaserDismissAriaLabel)}">&times;</button>
+    <button type="button" class="ccs-teaser-open" data-open-from-teaser>
+      <span class="ccs-teaser-title">${escapeHtml(state.teaserTitle)}</span>
+      <span class="ccs-teaser-text">${escapeHtml(state.teaserText)}</span>
+    </button>
+  </section>`;
 }
 function renderShellBody(state) {
     const messageStream = renderMessageStream(state);
@@ -191,17 +352,11 @@ function renderShellBody(state) {
 export function renderWidgetLayout(state) {
     const modeClass = state.mode === "landscape" ? "ccs-layout-landscape" : "ccs-layout-normal";
     const teaserMarkup = !state.isOpen && state.showTeaser
-        ? `<section class="ccs-teaser ${state.positionClass}" data-teaser>
-          <button type="button" class="ccs-teaser-close" data-dismiss-teaser aria-label="${escapeHtml(state.labels.teaserDismissAriaLabel)}">&times;</button>
-          <button type="button" class="ccs-teaser-open" data-open-from-teaser>
-            <span class="ccs-teaser-title">${escapeHtml(state.teaserTitle)}</span>
-            <span class="ccs-teaser-text">${escapeHtml(state.teaserText)}</span>
-          </button>
-        </section>`
+        ? renderTeaser(state)
         : "";
     return `<section class="ccs-root ${modeClass}">
     ${teaserMarkup}
-    <button type="button" class="ccs-toggle ${state.positionClass}${state.isOpen ? " ccs-toggle-hidden" : ""}" data-toggle-open aria-label="${escapeHtml(state.labels.openChatAriaLabel)}">💬</button>
+    ${renderToggle(state)}
     <section class="ccs-shell ${state.positionClass}${state.isOpen ? " ccs-shell-open" : " ccs-shell-closed"}">
       ${renderShellBody(state)}
     </section>

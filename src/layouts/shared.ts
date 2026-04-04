@@ -1,13 +1,18 @@
 import type {
   AssistantMessageActionState,
   I18nMessages,
+  InputCardRenderContext,
   Message,
+  MessageRenderContext,
+  RenderHooksConfig,
+  RenderHooksSharedContext,
   WidgetMode
 } from "../types.js";
 import { renderMarkdown } from "../utils/markdown.js";
 
 export interface LayoutRenderState {
   mode: WidgetMode;
+  conversationId: string | null;
   title: string;
   inputPlaceholder: string;
   positionClass: string;
@@ -25,6 +30,12 @@ export interface LayoutRenderState {
   isSendLoading: boolean;
   landscapePanelContent: string | null;
   labels: I18nMessages;
+  renderHooks: RenderHooksConfig;
+}
+
+interface NormalizedSourceLink {
+  url: string;
+  label: string;
 }
 
 function escapeHtml(value: string): string {
@@ -41,6 +52,45 @@ function formatTimestamp(createdAt: number): string {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function resolveRenderedMarkup(markup: unknown): string | null {
+  return typeof markup === "string" ? markup : null;
+}
+
+function createRenderHooksSharedContext(state: LayoutRenderState): RenderHooksSharedContext {
+  return {
+    mode: state.mode,
+    isOpen: state.isOpen,
+    conversationId: state.conversationId,
+    messages: state.messages,
+    labels: state.labels,
+    title: state.title,
+    inputPlaceholder: state.inputPlaceholder,
+    positionClass: state.positionClass,
+    allowRuntimeModeSwitch: state.allowRuntimeModeSwitch,
+    showRefreshButton: state.showRefreshButton,
+    teaserTitle: state.teaserTitle,
+    teaserText: state.teaserText,
+    isThinking: state.isThinking,
+    thinkingText: state.thinkingText,
+    isInputDisabled: state.isInputDisabled,
+    isSendLoading: state.isSendLoading
+  };
+}
+
+function createMessageRenderContext(
+  state: LayoutRenderState,
+  message: Message,
+  messageIndex: number,
+  assistantActionState: AssistantMessageActionState | undefined
+): MessageRenderContext {
+  return {
+    ...createRenderHooksSharedContext(state),
+    message,
+    messageIndex,
+    assistantActionState
+  };
 }
 
 function renderModeToggle(currentMode: WidgetMode, labels: I18nMessages): string {
@@ -150,18 +200,128 @@ function renderAssistantActionToolbar(
   </div>`;
 }
 
-function renderMessage(
-  message: Message,
-  labels: I18nMessages,
-  actionStateByMessageId: Readonly<Record<string, AssistantMessageActionState | undefined>>
-): string {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function normalizeSourceLink(input: unknown): NormalizedSourceLink | null {
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) {
+      return null;
+    }
+
+    return {
+      url: trimmed,
+      label: trimmed
+    };
+  }
+
+  const record = asRecord(input);
+  if (!record) {
+    return null;
+  }
+
+  const rawUrl =
+    typeof record.url === "string"
+      ? record.url
+      : typeof record.href === "string"
+        ? record.href
+        : "";
+
+  const url = rawUrl.trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return null;
+  }
+
+  const rawLabel =
+    typeof record.label === "string"
+      ? record.label
+      : typeof record.title === "string"
+        ? record.title
+        : url;
+
+  return {
+    url,
+    label: rawLabel.trim() || url
+  };
+}
+
+function extractSourceLinks(message: Message): NormalizedSourceLink[] {
+  const metadata = asRecord(message.metadata);
+  if (!metadata) {
+    return [];
+  }
+
+  const sources = metadata.sources;
+  if (!Array.isArray(sources)) {
+    return [];
+  }
+
+  const links: NormalizedSourceLink[] = [];
+
+  for (const entry of sources) {
+    const normalized = normalizeSourceLink(entry);
+    if (normalized) {
+      links.push(normalized);
+    }
+  }
+
+  return links;
+}
+
+function renderMessageSources(message: Message): string {
+  const links = extractSourceLinks(message);
+  if (links.length === 0) {
+    return "";
+  }
+
+  const items = links
+    .map(
+      (link) =>
+        `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
+          link.label
+        )}</a>`
+    )
+    .join("");
+
+  return `<div class="ccs-message-sources" data-message-sources>
+    <span class="ccs-message-sources-label">Sources</span>
+    ${items}
+  </div>`;
+}
+
+function renderMessage(state: LayoutRenderState, message: Message, messageIndex: number): string {
   const roleClass = message.role === "user" ? "ccs-message-user" : "ccs-message-assistant";
   const stateClass = `ccs-message-state-${message.state}`;
+  const assistantActionState = state.assistantActionStateByMessageId[message.id];
+  const renderContext = createMessageRenderContext(
+    state,
+    message,
+    messageIndex,
+    assistantActionState
+  );
+
   const assistantActionToolbar = renderAssistantActionToolbar(
     message,
-    labels,
-    actionStateByMessageId[message.id]
+    state.labels,
+    assistantActionState
   );
+
+  const customMetaMarkup = resolveRenderedMarkup(
+    state.renderHooks.renderMessageMeta?.(renderContext)
+  );
+  const customFooterMarkup = resolveRenderedMarkup(
+    state.renderHooks.renderMessageFooter?.(renderContext)
+  );
+
+  const messageMetaMarkup =
+    customMetaMarkup ?? `<span class="ccs-meta-time">${formatTimestamp(message.createdAt)}</span>`;
+  const messageFooterMarkup = `${renderMessageSources(message)}${customFooterMarkup ?? ""}`;
 
   const content =
     message.role === "assistant"
@@ -171,24 +331,21 @@ function renderMessage(
   return `<article class="ccs-message ${roleClass} ${stateClass}" data-message-id="${message.id}">
     <div class="ccs-bubble">${content}</div>
     <div class="ccs-meta-row">
-      <span class="ccs-meta-time">${formatTimestamp(message.createdAt)}</span>
+      ${messageMetaMarkup}
     </div>
+    ${messageFooterMarkup}
     ${assistantActionToolbar}
-    ${renderMessageActions(message, labels)}
+    ${renderMessageActions(message, state.labels)}
   </article>`;
 }
 
-function renderMessageList(
-  messages: readonly Message[],
-  labels: I18nMessages,
-  actionStateByMessageId: Readonly<Record<string, AssistantMessageActionState | undefined>>
-): string {
-  if (messages.length === 0) {
-    return `<p class="ccs-empty">${escapeHtml(labels.emptyMessageListText)}</p>`;
+function renderMessageList(state: LayoutRenderState): string {
+  if (state.messages.length === 0) {
+    return `<p class="ccs-empty">${escapeHtml(state.labels.emptyMessageListText)}</p>`;
   }
 
-  return messages
-    .map((message) => renderMessage(message, labels, actionStateByMessageId))
+  return state.messages
+    .map((message, messageIndex) => renderMessage(state, message, messageIndex))
     .join("");
 }
 
@@ -199,15 +356,46 @@ function renderThinkingIndicator(thinkingText: string): string {
   </div>`;
 }
 
+function findLatestAssistantMessage(messages: readonly Message[]): Message | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role === "assistant") {
+      return message;
+    }
+  }
+
+  return null;
+}
+
+function renderInputCard(state: LayoutRenderState): string {
+  const renderInputCardHook = state.renderHooks.renderInputCard;
+  if (!renderInputCardHook) {
+    return "";
+  }
+
+  const context: InputCardRenderContext = {
+    ...createRenderHooksSharedContext(state),
+    latestAssistantMessage: findLatestAssistantMessage(state.messages)
+  };
+
+  const rendered = resolveRenderedMarkup(renderInputCardHook(context));
+  return rendered ?? "";
+}
+
 function renderMessageStream(state: LayoutRenderState): string {
-  return `${renderMessageList(
-    state.messages,
-    state.labels,
-    state.assistantActionStateByMessageId
-  )}${state.isThinking ? renderThinkingIndicator(state.thinkingText) : ""}`;
+  const inputCardMarkup = renderInputCard(state);
+
+  return `${renderMessageList(state)}${state.isThinking ? renderThinkingIndicator(state.thinkingText) : ""}${inputCardMarkup}`;
 }
 
 function renderHeader(state: LayoutRenderState): string {
+  const customMarkup = resolveRenderedMarkup(
+    state.renderHooks.renderHeader?.(createRenderHooksSharedContext(state))
+  );
+  if (customMarkup !== null) {
+    return customMarkup;
+  }
+
   return `<header class="ccs-header">
     <h2 class="ccs-title">${escapeHtml(state.title)}</h2>
     <div class="ccs-header-controls">
@@ -220,8 +408,17 @@ function renderHeader(state: LayoutRenderState): string {
   </header>`;
 }
 
+function renderFooterMeta(state: LayoutRenderState): string {
+  const rendered = resolveRenderedMarkup(
+    state.renderHooks.renderFooterMeta?.(createRenderHooksSharedContext(state))
+  );
+
+  return rendered ?? "";
+}
+
 function renderFooter(state: LayoutRenderState): string {
   const inputDisabledAttribute = state.isInputDisabled ? " disabled" : "";
+  const footerMetaMarkup = renderFooterMeta(state);
 
   return `<form class="ccs-footer" data-chat-form>
     <div class="ccs-footer-input-row">
@@ -246,6 +443,7 @@ function renderFooter(state: LayoutRenderState): string {
         <span class="ccs-visually-hidden">${escapeHtml(state.labels.sendMessageLabel)}</span>
       </button>
     </div>
+    ${footerMetaMarkup}
   </form>`;
 }
 
@@ -253,6 +451,36 @@ function renderDefaultLandscapePanel(state: LayoutRenderState): string {
   return `<h3 class="ccs-side-title">${escapeHtml(state.labels.landscapeSidebarTitle)}</h3>
     <p class="ccs-side-copy">${escapeHtml(state.labels.landscapeSidebarLine1)}</p>
     <p class="ccs-side-copy">${escapeHtml(state.labels.landscapeSidebarLine2)}</p>`;
+}
+
+function renderToggle(state: LayoutRenderState): string {
+  const customMarkup = resolveRenderedMarkup(
+    state.renderHooks.renderToggle?.(createRenderHooksSharedContext(state))
+  );
+  if (customMarkup !== null) {
+    return customMarkup;
+  }
+
+  return `<button type="button" class="ccs-toggle ${state.positionClass}${
+    state.isOpen ? " ccs-toggle-hidden" : ""
+  }" data-toggle-open aria-label="${escapeHtml(state.labels.openChatAriaLabel)}">&#128172;</button>`;
+}
+
+function renderTeaser(state: LayoutRenderState): string {
+  const customMarkup = resolveRenderedMarkup(
+    state.renderHooks.renderTeaser?.(createRenderHooksSharedContext(state))
+  );
+  if (customMarkup !== null) {
+    return customMarkup;
+  }
+
+  return `<section class="ccs-teaser ${state.positionClass}" data-teaser>
+    <button type="button" class="ccs-teaser-close" data-dismiss-teaser aria-label="${escapeHtml(state.labels.teaserDismissAriaLabel)}">&times;</button>
+    <button type="button" class="ccs-teaser-open" data-open-from-teaser>
+      <span class="ccs-teaser-title">${escapeHtml(state.teaserTitle)}</span>
+      <span class="ccs-teaser-text">${escapeHtml(state.teaserText)}</span>
+    </button>
+  </section>`;
 }
 
 function renderShellBody(state: LayoutRenderState): string {
@@ -284,20 +512,12 @@ export function renderWidgetLayout(state: LayoutRenderState): string {
 
   const teaserMarkup =
     !state.isOpen && state.showTeaser
-      ? `<section class="ccs-teaser ${state.positionClass}" data-teaser>
-          <button type="button" class="ccs-teaser-close" data-dismiss-teaser aria-label="${escapeHtml(state.labels.teaserDismissAriaLabel)}">&times;</button>
-          <button type="button" class="ccs-teaser-open" data-open-from-teaser>
-            <span class="ccs-teaser-title">${escapeHtml(state.teaserTitle)}</span>
-            <span class="ccs-teaser-text">${escapeHtml(state.teaserText)}</span>
-          </button>
-        </section>`
+      ? renderTeaser(state)
       : "";
 
   return `<section class="ccs-root ${modeClass}">
     ${teaserMarkup}
-    <button type="button" class="ccs-toggle ${state.positionClass}${
-      state.isOpen ? " ccs-toggle-hidden" : ""
-    }" data-toggle-open aria-label="${escapeHtml(state.labels.openChatAriaLabel)}">💬</button>
+    ${renderToggle(state)}
     <section class="ccs-shell ${state.positionClass}${state.isOpen ? " ccs-shell-open" : " ccs-shell-closed"}">
       ${renderShellBody(state)}
     </section>

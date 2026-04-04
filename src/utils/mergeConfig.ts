@@ -5,6 +5,7 @@ import type {
   ConfigInput,
   LifecycleHooks,
   PresenceConfig,
+  RenderHooksConfig,
   StorageConfig,
   TeaserConfig,
   Theme,
@@ -103,6 +104,13 @@ function mergeActionHandlers(input: Partial<ActionHandlers> | undefined): Action
   };
 }
 
+function mergeRenderHooks(input: Partial<RenderHooksConfig> | undefined): RenderHooksConfig {
+  return {
+    ...CORE_DEFAULT_CONFIG.renderHooks,
+    ...(input ?? {})
+  };
+}
+
 export function mergeConfig(initConfig: ConfigInput, options: MergeConfigOptions = {}): Config {
   validateConfigInput(initConfig, "initConfig");
 
@@ -136,7 +144,8 @@ export function mergeConfig(initConfig: ConfigInput, options: MergeConfigOptions
     thinking: mergeThinking(initConfig.thinking),
     i18n: mergeI18n(initConfig.i18n),
     actionHandlers: mergeActionHandlers(initConfig.actionHandlers),
-    lifecycle: mergedLifecycle
+    lifecycle: mergedLifecycle,
+    renderHooks: mergeRenderHooks(initConfig.renderHooks)
   };
 
   validateResolvedConfig(mergedConfig);

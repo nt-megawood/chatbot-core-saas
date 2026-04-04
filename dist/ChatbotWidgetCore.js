@@ -45,6 +45,7 @@ export class ChatbotWidgetCore {
     copyIndicatorTimeoutId = null;
     presenceInFlight = false;
     landscapePanelCleanup = null;
+    renderHooksCleanup = null;
     visibilityListener = null;
     focusListener = null;
     assistantFeedbackByMessageId = new Map();
@@ -208,6 +209,7 @@ export class ChatbotWidgetCore {
         this.stopThinking();
         this.stopSpeaking(false);
         this.clearLandscapePanelCleanup();
+        this.clearRenderHooksCleanup();
         this.detachPresenceVisibilityHandlers();
         this.stopPresencePolling();
         if (this.usingShadowDom) {
@@ -783,6 +785,48 @@ export class ChatbotWidgetCore {
         this.landscapePanelCleanup();
         this.landscapePanelCleanup = null;
     }
+    clearRenderHooksCleanup() {
+        if (!this.renderHooksCleanup) {
+            return;
+        }
+        this.renderHooksCleanup();
+        this.renderHooksCleanup = null;
+    }
+    createRenderHooksSharedContext(inputBusy, positionClass) {
+        return {
+            mode: this.currentMode,
+            isOpen: this.isOpen,
+            conversationId: this.conversationId,
+            messages: this.messages,
+            labels: this.config.i18n.messages,
+            title: this.config.title,
+            inputPlaceholder: this.config.inputPlaceholder,
+            positionClass,
+            allowRuntimeModeSwitch: this.config.allowRuntimeModeSwitch,
+            showRefreshButton: this.config.showRefreshButton,
+            teaserTitle: this.config.teaser.title,
+            teaserText: this.config.teaser.text,
+            isThinking: this.isThinking,
+            thinkingText: this.thinkingText,
+            isInputDisabled: inputBusy,
+            isSendLoading: inputBusy
+        };
+    }
+    bindRenderHooks(rootElement, context) {
+        const bindRenderHooks = this.config.renderHooks.bind;
+        if (!bindRenderHooks) {
+            return;
+        }
+        const bindContext = {
+            ...context,
+            rootElement,
+            widget: this.actionApi
+        };
+        const cleanup = bindRenderHooks(bindContext);
+        if (typeof cleanup === "function") {
+            this.renderHooksCleanup = cleanup;
+        }
+    }
     createLandscapePanelRenderContext() {
         return {
             mode: this.currentMode,
@@ -825,25 +869,16 @@ export class ChatbotWidgetCore {
             return;
         }
         this.clearLandscapePanelCleanup();
+        this.clearRenderHooksCleanup();
         const inputBusy = this.isAwaitingAssistantResponse();
+        const positionClass = toPositionClass(this.config.position);
+        const renderHooksContext = this.createRenderHooksSharedContext(inputBusy, positionClass);
         const sharedLayoutState = {
-            title: this.config.title,
-            inputPlaceholder: this.config.inputPlaceholder,
-            positionClass: toPositionClass(this.config.position),
-            allowRuntimeModeSwitch: this.config.allowRuntimeModeSwitch,
-            showRefreshButton: this.config.showRefreshButton,
-            isOpen: this.isOpen,
+            ...renderHooksContext,
             showTeaser: this.teaserVisible,
-            teaserTitle: this.config.teaser.title,
-            teaserText: this.config.teaser.text,
-            messages: this.messages,
             assistantActionStateByMessageId: this.buildAssistantActionStateByMessageId(),
-            isThinking: this.isThinking,
-            thinkingText: this.thinkingText,
-            isInputDisabled: inputBusy,
-            isSendLoading: inputBusy,
             landscapePanelContent: this.resolveLandscapePanelContent(),
-            labels: this.config.i18n.messages
+            renderHooks: this.config.renderHooks
         };
         const layout = this.currentMode === "landscape"
             ? renderLandscapeLayout(sharedLayoutState)
@@ -857,6 +892,7 @@ export class ChatbotWidgetCore {
         applyThemeTokens(rootElement, this.config.theme.tokens, this.config.theme.fontFamilies);
         this.bindUi(rootElement);
         this.bindLandscapePanel(rootElement);
+        this.bindRenderHooks(rootElement, renderHooksContext);
         const messageContainer = rootElement.querySelector("[data-chat-messages]");
         if (messageContainer) {
             messageContainer.scrollTop = messageContainer.scrollHeight;

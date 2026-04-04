@@ -16,6 +16,7 @@ const CONFIG_KEYS = new Set([
     "i18n",
     "actionHandlers",
     "lifecycle",
+    "renderHooks",
     "landscapePanel",
     "resolveWelcomeMessage",
     "useShadowDom"
@@ -61,6 +62,16 @@ const ACTION_HANDLER_KEYS = new Set([
     "openUrl",
     "custom",
     "assistantAction"
+]);
+const RENDER_HOOK_KEYS = new Set([
+    "renderHeader",
+    "renderToggle",
+    "renderTeaser",
+    "renderMessageMeta",
+    "renderMessageFooter",
+    "renderFooterMeta",
+    "renderInputCard",
+    "bind"
 ]);
 const LANDSCAPE_PANEL_KEYS = new Set(["render", "bind"]);
 const I18N_KEYS = new Set([
@@ -219,6 +230,15 @@ function validateActionHandlersMap(value, path) {
         }
     }
 }
+function validateRenderHooksInput(value, path) {
+    assertRecord(value, path);
+    assertUnknownKeys(value, RENDER_HOOK_KEYS, path);
+    for (const [key, renderer] of Object.entries(value)) {
+        if (renderer !== undefined && typeof renderer !== "function") {
+            throw new Error(`${path}.${key} must be a function when provided.`);
+        }
+    }
+}
 function validateLandscapePanelInput(value, path) {
     assertRecord(value, path);
     assertUnknownKeys(value, LANDSCAPE_PANEL_KEYS, path);
@@ -333,6 +353,9 @@ export function validateConfigInput(value, path = "config") {
     }
     if ("lifecycle" in value) {
         validateLifecycleMap(value.lifecycle, `${path}.lifecycle`);
+    }
+    if ("renderHooks" in value) {
+        validateRenderHooksInput(value.renderHooks, `${path}.renderHooks`);
     }
     if ("landscapePanel" in value && value.landscapePanel !== undefined) {
         validateLandscapePanelInput(value.landscapePanel, `${path}.landscapePanel`);

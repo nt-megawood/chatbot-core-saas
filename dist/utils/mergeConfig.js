@@ -61,6 +61,12 @@ function mergeActionHandlers(input) {
         ...(input ?? {})
     };
 }
+function mergeRenderHooks(input) {
+    return {
+        ...CORE_DEFAULT_CONFIG.renderHooks,
+        ...(input ?? {})
+    };
+}
 export function mergeConfig(initConfig, options = {}) {
     validateConfigInput(initConfig, "initConfig");
     if (options.implementationThemeDefaults) {
@@ -84,7 +90,8 @@ export function mergeConfig(initConfig, options = {}) {
         thinking: mergeThinking(initConfig.thinking),
         i18n: mergeI18n(initConfig.i18n),
         actionHandlers: mergeActionHandlers(initConfig.actionHandlers),
-        lifecycle: mergedLifecycle
+        lifecycle: mergedLifecycle,
+        renderHooks: mergeRenderHooks(initConfig.renderHooks)
     };
     validateResolvedConfig(mergedConfig);
     return mergedConfig;

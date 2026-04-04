@@ -60,6 +60,7 @@ export const CORE_DEFAULT_CONFIG: Config = {
   i18n: resolveI18nConfig(undefined),
   actionHandlers: {},
   lifecycle: {},
+  renderHooks: {},
   useShadowDom: true
 };
 

@@ -7,6 +7,7 @@ import type {
   LandscapePanelConfig,
   LifecycleHooks,
   PresenceConfig,
+  RenderHooksConfig,
   StorageConfig,
   TeaserConfig,
   ThemeInput,
@@ -34,6 +35,7 @@ const CONFIG_KEYS = new Set<string>([
   "i18n",
   "actionHandlers",
   "lifecycle",
+  "renderHooks",
   "landscapePanel",
   "resolveWelcomeMessage",
   "useShadowDom"
@@ -83,6 +85,16 @@ const ACTION_HANDLER_KEYS = new Set<keyof ActionHandlers>([
   "openUrl",
   "custom",
   "assistantAction"
+]);
+const RENDER_HOOK_KEYS = new Set<keyof RenderHooksConfig>([
+  "renderHeader",
+  "renderToggle",
+  "renderTeaser",
+  "renderMessageMeta",
+  "renderMessageFooter",
+  "renderFooterMeta",
+  "renderInputCard",
+  "bind"
 ]);
 const LANDSCAPE_PANEL_KEYS = new Set<keyof LandscapePanelConfig>(["render", "bind"]);
 const I18N_KEYS = new Set<keyof I18nConfigInput | "messages">([
@@ -280,6 +292,20 @@ function validateActionHandlersMap(
   }
 }
 
+function validateRenderHooksInput(
+  value: unknown,
+  path: string
+): asserts value is Partial<RenderHooksConfig> {
+  assertRecord(value, path);
+  assertUnknownKeys(value, RENDER_HOOK_KEYS, path);
+
+  for (const [key, renderer] of Object.entries(value)) {
+    if (renderer !== undefined && typeof renderer !== "function") {
+      throw new Error(`${path}.${key} must be a function when provided.`);
+    }
+  }
+}
+
 function validateLandscapePanelInput(
   value: unknown,
   path: string
@@ -437,6 +463,10 @@ export function validateConfigInput(value: unknown, path = "config"): asserts va
 
   if ("lifecycle" in value) {
     validateLifecycleMap(value.lifecycle, `${path}.lifecycle`);
+  }
+
+  if ("renderHooks" in value) {
+    validateRenderHooksInput(value.renderHooks, `${path}.renderHooks`);
   }
 
   if ("landscapePanel" in value && value.landscapePanel !== undefined) {

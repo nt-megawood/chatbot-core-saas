@@ -47,6 +47,9 @@ export function createWidgetStyles(scopeClass: string | null): string {
   const message = scopeSelector(scopeClass, ".ccs-message");
   const metaRow = scopeSelector(scopeClass, ".ccs-meta-row");
   const metaTime = scopeSelector(scopeClass, ".ccs-meta-time");
+  const messageSources = scopeSelector(scopeClass, ".ccs-message-sources");
+  const messageSourcesLabel = scopeSelector(scopeClass, ".ccs-message-sources-label");
+  const messageSourcesLink = scopeSelector(scopeClass, ".ccs-message-sources a");
   const assistantActions = scopeSelector(scopeClass, ".ccs-assistant-actions");
   const assistantActionButton = scopeSelector(scopeClass, ".ccs-assistant-action-btn");
   const assistantActionButtonActive = scopeSelector(
@@ -389,6 +392,27 @@ ${metaRow} {
 ${metaTime} {
   color: #aaaaaa;
   font-size: 11px;
+}
+
+${messageSources} {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+${messageSourcesLabel} {
+  color: #888888;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+${messageSourcesLink} {
+  color: var(--ccs-color-primary);
+  font-size: 12px;
+  line-height: 1.35;
+  text-decoration: underline;
+  word-break: break-word;
 }
 
 ${assistantActions} {

@@ -33,6 +33,7 @@ export declare class ChatbotWidgetCore {
     private copyIndicatorTimeoutId;
     private presenceInFlight;
     private landscapePanelCleanup;
+    private renderHooksCleanup;
     private visibilityListener;
     private focusListener;
     private readonly assistantFeedbackByMessageId;
@@ -84,6 +85,9 @@ export declare class ChatbotWidgetCore {
     private pollPresence;
     private handleAction;
     private clearLandscapePanelCleanup;
+    private clearRenderHooksCleanup;
+    private createRenderHooksSharedContext;
+    private bindRenderHooks;
     private createLandscapePanelRenderContext;
     private resolveLandscapePanelContent;
     private bindLandscapePanel;

@@ -165,6 +165,7 @@ All top-level ConfigInput fields are listed below.
 | actionHandlers | Partial<ActionHandlers> | {} | Override send_message/open_url/custom/assistant toolbar handling |
 | lifecycle | Partial<LifecycleHooks> | {} | Runtime callbacks for host instrumentation |
 | landscapePanel | LandscapePanelConfig | undefined | Landscape-only extension panel contract |
+| renderHooks | Partial<RenderHooksConfig> | {} | Optional render/bind extension points for shell and message sections |
 | resolveWelcomeMessage | (context) => string | default welcome text | Dynamic welcome message resolver |
 | useShadowDom | boolean | true | Shadow DOM first, scoped-CSS fallback otherwise |
 
@@ -256,6 +257,19 @@ LandscapePanelConfig:
 | --- | --- |
 | render(context) | (LandscapePanelRenderContext) => string |
 | bind(context) | (LandscapePanelBindContext) => void or cleanup function |
+
+RenderHooksConfig:
+
+| Field | Type |
+| --- | --- |
+| renderHeader(context) | (RenderHooksSharedContext) => string |
+| renderToggle(context) | (RenderHooksSharedContext) => string |
+| renderTeaser(context) | (RenderHooksSharedContext) => string |
+| renderMessageMeta(context) | (MessageRenderContext) => string |
+| renderMessageFooter(context) | (MessageRenderContext) => string |
+| renderFooterMeta(context) | (RenderHooksSharedContext) => string |
+| renderInputCard(context) | (InputCardRenderContext) => string |
+| bind(context) | (RenderHooksBindContext) => void or cleanup function |
 
 Validation constraints enforced by core:
 
@@ -357,6 +371,15 @@ Integration points:
 
 - actionHandlers.assistantAction for custom handling
 - lifecycle.onAssistantActionInvoked for telemetry
+
+## Source Metadata Links
+
+Assistant messages can render source links from message metadata when a transport completes with:
+
+- metadata.sources: string[]
+- metadata.sources: Array<{ url?: string; href?: string; label?: string; title?: string }>
+
+Only http/https links are rendered. This keeps default behavior unchanged for messages without source metadata while enabling source attribution paths in generic core rendering.
 
 ## Landscape Extension Panel Contract
 
