@@ -4,6 +4,7 @@ import type {
   ConfigInput,
   I18nConfigInput,
   I18nMessages,
+  LandscapePanelConfig,
   LifecycleHooks,
   PresenceConfig,
   StorageConfig,
@@ -33,6 +34,7 @@ const CONFIG_KEYS = new Set<string>([
   "i18n",
   "actionHandlers",
   "lifecycle",
+  "landscapePanel",
   "resolveWelcomeMessage",
   "useShadowDom"
 ]);
@@ -58,7 +60,8 @@ const LIFECYCLE_KEYS = new Set<keyof LifecycleHooks>([
   "onOpenChange",
   "onTeaser",
   "onPresence",
-  "onActionInvoked"
+  "onActionInvoked",
+  "onAssistantActionInvoked"
 ]);
 
 const TEASER_KEYS = new Set<keyof TeaserConfig>(["enabled", "delayMs", "title", "text"]);
@@ -75,7 +78,13 @@ const PRESENCE_KEYS = new Set<keyof PresenceConfig>([
   "pollWhenClosed"
 ]);
 const THINKING_KEYS = new Set<keyof ThinkingConfig>(["messages", "intervalMs"]);
-const ACTION_HANDLER_KEYS = new Set<keyof ActionHandlers>(["sendMessage", "openUrl", "custom"]);
+const ACTION_HANDLER_KEYS = new Set<keyof ActionHandlers>([
+  "sendMessage",
+  "openUrl",
+  "custom",
+  "assistantAction"
+]);
+const LANDSCAPE_PANEL_KEYS = new Set<keyof LandscapePanelConfig>(["render", "bind"]);
 const I18N_KEYS = new Set<keyof I18nConfigInput | "messages">([
   "locale",
   "fallbackLocale",
@@ -87,6 +96,13 @@ const I18N_MESSAGE_KEYS = new Set<keyof I18nMessages>([
   "layoutModeNormalLabel",
   "layoutModeLandscapeLabel",
   "messageActionsAriaLabel",
+  "assistantActionsAriaLabel",
+  "assistantFeedbackUpAriaLabel",
+  "assistantFeedbackDownAriaLabel",
+  "assistantCopyAriaLabel",
+  "assistantCopiedAriaLabel",
+  "assistantSpeakAriaLabel",
+  "assistantStopSpeakAriaLabel",
   "emptyMessageListText",
   "landscapeSidebarTitle",
   "landscapeSidebarLine1",
@@ -264,6 +280,22 @@ function validateActionHandlersMap(
   }
 }
 
+function validateLandscapePanelInput(
+  value: unknown,
+  path: string
+): asserts value is LandscapePanelConfig {
+  assertRecord(value, path);
+  assertUnknownKeys(value, LANDSCAPE_PANEL_KEYS, path);
+
+  if ("render" in value && value.render !== undefined && typeof value.render !== "function") {
+    throw new Error(`${path}.render must be a function when provided.`);
+  }
+
+  if ("bind" in value && value.bind !== undefined && typeof value.bind !== "function") {
+    throw new Error(`${path}.bind must be a function when provided.`);
+  }
+}
+
 function validateI18nMessages(
   value: unknown,
   path: string
@@ -405,6 +437,10 @@ export function validateConfigInput(value: unknown, path = "config"): asserts va
 
   if ("lifecycle" in value) {
     validateLifecycleMap(value.lifecycle, `${path}.lifecycle`);
+  }
+
+  if ("landscapePanel" in value && value.landscapePanel !== undefined) {
+    validateLandscapePanelInput(value.landscapePanel, `${path}.landscapePanel`);
   }
 
   if ("resolveWelcomeMessage" in value) {

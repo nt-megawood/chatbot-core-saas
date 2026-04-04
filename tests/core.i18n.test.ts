@@ -34,12 +34,16 @@ describe("ChatbotWidgetCore i18n", () => {
     const refreshButton = mount.querySelector<HTMLButtonElement>("[data-refresh-chat]");
     const input = mount.querySelector<HTMLTextAreaElement>("[data-chat-input]");
     const sendButton = mount.querySelector<HTMLButtonElement>(".ccs-send");
+    const feedbackUpButton = mount.querySelector<HTMLButtonElement>(
+      '[data-assistant-action="feedback_up"]'
+    );
     const modeButtons = Array.from(mount.querySelectorAll<HTMLButtonElement>("[data-set-mode]"));
 
     expect(closeButton?.title).toBe("Chat schliessen");
     expect(refreshButton?.title).toBe("Gespraech neu starten");
     expect(input?.getAttribute("aria-label")).toBe("Nachricht eingeben");
-    expect(sendButton?.textContent?.trim()).toBe("Senden");
+    expect(sendButton?.textContent).toContain("Senden");
+    expect(feedbackUpButton?.getAttribute("aria-label")).toBe("Antwort als hilfreich markieren");
     expect(modeButtons.map((button) => button.textContent?.trim())).toEqual(["Standard", "Breit"]);
   });
 
@@ -76,7 +80,7 @@ describe("ChatbotWidgetCore i18n", () => {
     const sendButton = mount.querySelector<HTMLButtonElement>(".ccs-send");
 
     expect(toggleButton?.getAttribute("aria-label")).toBe("Ouvrir le chat");
-    expect(sendButton?.textContent?.trim()).toBe("Envoyer");
+    expect(sendButton?.textContent).toContain("Envoyer");
     expect(sendButton?.getAttribute("aria-label")).toBe("Envoyer un message");
   });
 

@@ -16,11 +16,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  upload:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build dist
+        run: npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -28,7 +43,7 @@ jobs:
           path: ./dist
 
   deploy:
-    needs: upload
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages

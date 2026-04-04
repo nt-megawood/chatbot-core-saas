@@ -5,12 +5,18 @@ import { MockChatTransport } from "./mock/mockTransport.js";
 import { createLocalStorageConversationStore } from "./storage/localStorageConversationStore.js";
 import { applyThemeTokens, createWidgetStyles } from "./styles.js";
 import type {
+  AssistantActionExecutionContext,
+  AssistantFeedbackValue,
+  AssistantMessageActionState,
+  AssistantMessageActionType,
   ActionExecutionContext,
   ChatTransport,
   Config,
   ConfigInput,
   ConversationSnapshot,
   ConversationStore,
+  LandscapePanelBindContext,
+  LandscapePanelRenderContext,
   Message,
   MessageAction,
   MessageRole,
@@ -74,9 +80,14 @@ export class ChatbotWidgetCore {
   private teaserTimeoutId: number | null = null;
   private thinkingIntervalId: number | null = null;
   private presenceIntervalId: number | null = null;
+  private copyIndicatorTimeoutId: number | null = null;
   private presenceInFlight = false;
+  private landscapePanelCleanup: (() => void) | null = null;
   private visibilityListener: (() => void) | null = null;
   private focusListener: (() => void) | null = null;
+  private readonly assistantFeedbackByMessageId = new Map<string, AssistantFeedbackValue>();
+  private copiedMessageId: string | null = null;
+  private speakingMessageId: string | null = null;
 
   public static fromScript(
     scriptElement: HTMLScriptElement,
@@ -195,6 +206,7 @@ export class ChatbotWidgetCore {
 
   public clearConversation(): void {
     this.stopThinking();
+    this.resetAssistantMessageInteractions();
     this.messages = [];
     this.conversationId = null;
     this.presenceInFlight = false;
@@ -264,7 +276,10 @@ export class ChatbotWidgetCore {
     }
 
     this.clearTeaserTimer();
+    this.clearCopyIndicatorTimer();
     this.stopThinking();
+    this.stopSpeaking(false);
+    this.clearLandscapePanelCleanup();
     this.detachPresenceVisibilityHandlers();
     this.stopPresencePolling();
 
@@ -501,6 +516,212 @@ export class ChatbotWidgetCore {
     return normalized.length > 0 ? normalized : undefined;
   }
 
+  private isAwaitingAssistantResponse(): boolean {
+    return this.messages.some(
+      (message) =>
+        message.role === "assistant" && (message.state === "pending" || message.state === "streaming")
+    );
+  }
+
+  private clearCopyIndicatorTimer(): void {
+    if (this.copyIndicatorTimeoutId === null) {
+      return;
+    }
+
+    window.clearTimeout(this.copyIndicatorTimeoutId);
+    this.copyIndicatorTimeoutId = null;
+  }
+
+  private markMessageCopied(messageId: string): void {
+    this.copiedMessageId = messageId;
+    this.clearCopyIndicatorTimer();
+
+    this.copyIndicatorTimeoutId = window.setTimeout(() => {
+      if (this.copiedMessageId === messageId) {
+        this.copiedMessageId = null;
+        this.render();
+      }
+      this.copyIndicatorTimeoutId = null;
+    }, 1_500);
+  }
+
+  private supportsSpeechSynthesis(): boolean {
+    return typeof window !== "undefined" && "speechSynthesis" in window;
+  }
+
+  private stopSpeaking(renderAfterStop = false): void {
+    if (this.supportsSpeechSynthesis()) {
+      window.speechSynthesis.cancel();
+    }
+
+    const wasSpeaking = this.speakingMessageId !== null;
+    this.speakingMessageId = null;
+
+    if (renderAfterStop && wasSpeaking) {
+      this.render();
+    }
+  }
+
+  private resetAssistantMessageInteractions(): void {
+    this.assistantFeedbackByMessageId.clear();
+    this.copiedMessageId = null;
+    this.clearCopyIndicatorTimer();
+    this.stopSpeaking(false);
+  }
+
+  private buildAssistantActionStateByMessageId(): Readonly<
+    Record<string, AssistantMessageActionState | undefined>
+  > {
+    const stateByMessageId: Record<string, AssistantMessageActionState | undefined> = {};
+
+    for (const message of this.messages) {
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      stateByMessageId[message.id] = {
+        feedback: this.assistantFeedbackByMessageId.get(message.id) ?? null,
+        copied: this.copiedMessageId === message.id,
+        speaking: this.speakingMessageId === message.id
+      };
+    }
+
+    return stateByMessageId;
+  }
+
+  private resolveAssistantActionState(messageId: string): AssistantMessageActionState {
+    return {
+      feedback: this.assistantFeedbackByMessageId.get(messageId) ?? null,
+      copied: this.copiedMessageId === messageId,
+      speaking: this.speakingMessageId === messageId
+    };
+  }
+
+  private setFeedbackState(
+    messageId: string,
+    requestedFeedback: Exclude<AssistantFeedbackValue, null>
+  ): void {
+    const previous = this.assistantFeedbackByMessageId.get(messageId) ?? null;
+    const next = previous === requestedFeedback ? null : requestedFeedback;
+
+    if (next === null) {
+      this.assistantFeedbackByMessageId.delete(messageId);
+      return;
+    }
+
+    this.assistantFeedbackByMessageId.set(messageId, next);
+  }
+
+  private async copyMessageText(text: string): Promise<boolean> {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // Fall back to a temporary textarea for browsers that block async clipboard writes.
+      }
+    }
+
+    if (typeof document === "undefined") {
+      return false;
+    }
+
+    const tempTextArea = document.createElement("textarea");
+    tempTextArea.value = text;
+    tempTextArea.setAttribute("readonly", "readonly");
+    tempTextArea.style.position = "absolute";
+    tempTextArea.style.left = "-9999px";
+    document.body.appendChild(tempTextArea);
+    tempTextArea.select();
+
+    try {
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      tempTextArea.remove();
+    }
+  }
+
+  private toggleSpeechForMessage(message: Message): void {
+    if (!this.supportsSpeechSynthesis()) {
+      return;
+    }
+
+    if (this.speakingMessageId === message.id) {
+      this.stopSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(message.text);
+    this.speakingMessageId = message.id;
+
+    utterance.onend = () => {
+      if (this.speakingMessageId !== message.id) {
+        return;
+      }
+
+      this.speakingMessageId = null;
+      this.render();
+    };
+
+    utterance.onerror = () => {
+      if (this.speakingMessageId !== message.id) {
+        return;
+      }
+
+      this.speakingMessageId = null;
+      this.render();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  private async handleAssistantAction(
+    action: AssistantMessageActionType,
+    sourceMessage: Message
+  ): Promise<void> {
+    if (sourceMessage.role !== "assistant") {
+      return;
+    }
+
+    if (action === "feedback_up") {
+      this.setFeedbackState(sourceMessage.id, "up");
+    } else if (action === "feedback_down") {
+      this.setFeedbackState(sourceMessage.id, "down");
+    } else if (action === "copy") {
+      const copied = await this.copyMessageText(sourceMessage.text);
+      if (copied) {
+        this.markMessageCopied(sourceMessage.id);
+      }
+    } else if (action === "speak") {
+      this.toggleSpeechForMessage(sourceMessage);
+    }
+
+    const context: AssistantActionExecutionContext = {
+      action,
+      sourceMessage,
+      state: this.resolveAssistantActionState(sourceMessage.id),
+      widget: this.actionApi,
+      timestamp: this.now()
+    };
+
+    this.config.lifecycle.onAssistantActionInvoked?.({
+      action,
+      sourceMessage,
+      state: context.state,
+      timestamp: context.timestamp
+    });
+
+    this.render();
+
+    if (this.config.actionHandlers.assistantAction) {
+      await this.config.actionHandlers.assistantAction(context);
+    }
+  }
+
   private hydrateFromStore(): void {
     if (!this.conversationStore) {
       return;
@@ -513,6 +734,7 @@ export class ChatbotWidgetCore {
 
     this.conversationId = snapshot.conversationId;
     this.messages = snapshot.messages;
+    this.resetAssistantMessageInteractions();
     this.currentMode = snapshot.mode;
     this.teaserDismissed = snapshot.teaserDismissed;
     if (this.config.storage.persistOpenState) {
@@ -770,10 +992,69 @@ export class ChatbotWidgetCore {
     }
   }
 
+  private clearLandscapePanelCleanup(): void {
+    if (!this.landscapePanelCleanup) {
+      return;
+    }
+
+    this.landscapePanelCleanup();
+    this.landscapePanelCleanup = null;
+  }
+
+  private createLandscapePanelRenderContext(): LandscapePanelRenderContext {
+    return {
+      mode: this.currentMode,
+      isOpen: this.isOpen,
+      conversationId: this.conversationId,
+      messages: this.messages,
+      labels: this.config.i18n.messages
+    };
+  }
+
+  private resolveLandscapePanelContent(): string | null {
+    const renderLandscapePanel = this.config.landscapePanel?.render;
+
+    if (!renderLandscapePanel || this.currentMode !== "landscape") {
+      return null;
+    }
+
+    const rendered = renderLandscapePanel(this.createLandscapePanelRenderContext());
+    return typeof rendered === "string" ? rendered : null;
+  }
+
+  private bindLandscapePanel(rootElement: HTMLElement): void {
+    const bindLandscapePanel = this.config.landscapePanel?.bind;
+
+    if (!bindLandscapePanel || this.currentMode !== "landscape") {
+      return;
+    }
+
+    const panelElement = rootElement.querySelector<HTMLElement>("[data-landscape-panel]");
+    if (!panelElement) {
+      return;
+    }
+
+    const bindContext: LandscapePanelBindContext = {
+      ...this.createLandscapePanelRenderContext(),
+      rootElement,
+      panelElement,
+      widget: this.actionApi
+    };
+
+    const cleanup = bindLandscapePanel(bindContext);
+    if (typeof cleanup === "function") {
+      this.landscapePanelCleanup = cleanup;
+    }
+  }
+
   private render(): void {
     if (!this.renderRoot) {
       return;
     }
+
+    this.clearLandscapePanelCleanup();
+
+    const inputBusy = this.isAwaitingAssistantResponse();
 
     const sharedLayoutState = {
       title: this.config.title,
@@ -786,8 +1067,12 @@ export class ChatbotWidgetCore {
       teaserTitle: this.config.teaser.title,
       teaserText: this.config.teaser.text,
       messages: this.messages,
+      assistantActionStateByMessageId: this.buildAssistantActionStateByMessageId(),
       isThinking: this.isThinking,
       thinkingText: this.thinkingText,
+      isInputDisabled: inputBusy,
+      isSendLoading: inputBusy,
+      landscapePanelContent: this.resolveLandscapePanelContent(),
       labels: this.config.i18n.messages
     };
 
@@ -806,6 +1091,7 @@ export class ChatbotWidgetCore {
 
     applyThemeTokens(rootElement, this.config.theme.tokens, this.config.theme.fontFamilies);
     this.bindUi(rootElement);
+    this.bindLandscapePanel(rootElement);
 
     const messageContainer = rootElement.querySelector<HTMLElement>("[data-chat-messages]");
     if (messageContainer) {
@@ -860,6 +1146,33 @@ export class ChatbotWidgetCore {
       });
     });
 
+    const assistantActionButtons = rootElement.querySelectorAll<HTMLButtonElement>(
+      "[data-assistant-action-message-id][data-assistant-action]"
+    );
+    assistantActionButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const messageId = button.dataset.assistantActionMessageId;
+        const assistantAction = button.dataset.assistantAction;
+
+        if (
+          !messageId ||
+          (assistantAction !== "feedback_up" &&
+            assistantAction !== "feedback_down" &&
+            assistantAction !== "copy" &&
+            assistantAction !== "speak")
+        ) {
+          return;
+        }
+
+        const sourceMessage = this.messages.find((message) => message.id === messageId);
+        if (!sourceMessage) {
+          return;
+        }
+
+        void this.handleAssistantAction(assistantAction, sourceMessage).catch(() => undefined);
+      });
+    });
+
     const form = rootElement.querySelector<HTMLFormElement>("[data-chat-form]");
     const input = rootElement.querySelector<HTMLTextAreaElement>("[data-chat-input]");
 
@@ -872,17 +1185,31 @@ export class ChatbotWidgetCore {
       input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
     };
 
+    const canSubmit = (): boolean => !input.disabled && !this.isAwaitingAssistantResponse();
+
     input.addEventListener("input", autoResize);
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        if (!canSubmit()) {
+          return;
+        }
         form.requestSubmit();
       }
     });
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const value = input.value;
+
+      if (!canSubmit()) {
+        return;
+      }
+
+      const value = input.value.trim();
+      if (!value) {
+        return;
+      }
+
       input.value = "";
       input.style.height = "auto";
       void this.sendMessage(value).catch(() => undefined);

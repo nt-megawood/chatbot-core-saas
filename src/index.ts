@@ -6,6 +6,11 @@ export { renderMarkdown } from "./utils/markdown.js";
 export { getBuiltinI18nMessages, resolveI18nConfig } from "./i18n.js";
 
 export type {
+  AssistantActionExecutionContext,
+  AssistantActionInvokedEvent,
+  AssistantFeedbackValue,
+  AssistantMessageActionState,
+  AssistantMessageActionType,
   ActionExecutionContext,
   ActionHandlers,
   ActionInvokedEvent,
@@ -15,6 +20,9 @@ export type {
   I18nConfig,
   I18nConfigInput,
   I18nMessages,
+  LandscapePanelBindContext,
+  LandscapePanelConfig,
+  LandscapePanelRenderContext,
   ConversationSnapshot,
   ConversationStore,
   InitializeEvent,

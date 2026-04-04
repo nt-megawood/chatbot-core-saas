@@ -16,6 +16,20 @@ export type MessageState = "pending" | "streaming" | "complete" | "error";
 
 export type MessageActionType = "send_message" | "open_url" | "custom";
 
+export type AssistantMessageActionType =
+  | "feedback_up"
+  | "feedback_down"
+  | "copy"
+  | "speak";
+
+export type AssistantFeedbackValue = "up" | "down" | null;
+
+export interface AssistantMessageActionState {
+  feedback: AssistantFeedbackValue;
+  copied: boolean;
+  speaking: boolean;
+}
+
 export interface MessageAction {
   id?: string;
   label: string;
@@ -89,6 +103,13 @@ export interface I18nMessages {
   layoutModeNormalLabel: string;
   layoutModeLandscapeLabel: string;
   messageActionsAriaLabel: string;
+  assistantActionsAriaLabel: string;
+  assistantFeedbackUpAriaLabel: string;
+  assistantFeedbackDownAriaLabel: string;
+  assistantCopyAriaLabel: string;
+  assistantCopiedAriaLabel: string;
+  assistantSpeakAriaLabel: string;
+  assistantStopSpeakAriaLabel: string;
   emptyMessageListText: string;
   landscapeSidebarTitle: string;
   landscapeSidebarLine1: string;
@@ -100,6 +121,25 @@ export interface I18nMessages {
   inputAriaLabel: string;
   sendMessageAriaLabel: string;
   sendMessageLabel: string;
+}
+
+export interface LandscapePanelRenderContext {
+  mode: WidgetMode;
+  isOpen: boolean;
+  conversationId: string | null;
+  messages: readonly Message[];
+  labels: I18nMessages;
+}
+
+export interface LandscapePanelBindContext extends LandscapePanelRenderContext {
+  rootElement: HTMLElement;
+  panelElement: HTMLElement;
+  widget: WidgetActionApi;
+}
+
+export interface LandscapePanelConfig {
+  render?: (context: LandscapePanelRenderContext) => string;
+  bind?: (context: LandscapePanelBindContext) => void | (() => void);
 }
 
 export interface I18nConfigInput {
@@ -130,10 +170,19 @@ export interface ActionExecutionContext {
   timestamp: number;
 }
 
+export interface AssistantActionExecutionContext {
+  action: AssistantMessageActionType;
+  sourceMessage: Message;
+  state: AssistantMessageActionState;
+  widget: WidgetActionApi;
+  timestamp: number;
+}
+
 export interface ActionHandlers {
   sendMessage?: (context: ActionExecutionContext) => void | Promise<void>;
   openUrl?: (context: ActionExecutionContext) => void | Promise<void>;
   custom?: (context: ActionExecutionContext) => void | Promise<void>;
+  assistantAction?: (context: AssistantActionExecutionContext) => void | Promise<void>;
 }
 
 export interface InitializeEvent {
@@ -187,6 +236,13 @@ export interface ActionInvokedEvent {
   timestamp: number;
 }
 
+export interface AssistantActionInvokedEvent {
+  action: AssistantMessageActionType;
+  sourceMessage: Message;
+  state: AssistantMessageActionState;
+  timestamp: number;
+}
+
 export interface LifecycleHooks {
   onInitialize?: (event: InitializeEvent) => void;
   onMessageSent?: (event: MessageSentEvent) => void;
@@ -196,6 +252,7 @@ export interface LifecycleHooks {
   onTeaser?: (event: TeaserEvent) => void;
   onPresence?: (event: PresenceEvent) => void;
   onActionInvoked?: (event: ActionInvokedEvent) => void;
+  onAssistantActionInvoked?: (event: AssistantActionInvokedEvent) => void;
 }
 
 export interface WelcomeMessageContext {
@@ -222,6 +279,7 @@ export interface Config {
   i18n: I18nConfig;
   actionHandlers: ActionHandlers;
   lifecycle: LifecycleHooks;
+  landscapePanel?: LandscapePanelConfig;
   resolveWelcomeMessage?: (context: WelcomeMessageContext) => string;
   useShadowDom?: boolean;
 }
