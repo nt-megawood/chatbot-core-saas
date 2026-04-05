@@ -49,7 +49,7 @@ export declare class ChatbotWidgetCore {
     open(source?: "api" | "toggle" | "teaser-open"): void;
     close(source?: "api" | "header-close" | "toggle"): void;
     toggle(): void;
-    clearConversation(): void;
+    clearConversation(source?: "api" | "refresh"): void;
     dismissTeaser(): void;
     mount(host: HTMLElement): void;
     unmount(): void;

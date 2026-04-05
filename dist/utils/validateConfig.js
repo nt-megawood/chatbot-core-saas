@@ -36,6 +36,7 @@ const LIFECYCLE_KEYS = new Set([
     "onInitialize",
     "onMessageSent",
     "onStreamUpdate",
+    "onConversationCleared",
     "onToggleLayout",
     "onOpenChange",
     "onTeaser",

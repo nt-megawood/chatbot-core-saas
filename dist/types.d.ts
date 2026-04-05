@@ -210,6 +210,12 @@ export interface StreamUpdateEvent {
     isFinal: boolean;
     timestamp: number;
 }
+export interface ConversationClearedEvent {
+    source: "api" | "refresh";
+    previousConversationId: string | null;
+    previousMessageCount: number;
+    timestamp: number;
+}
 export interface ToggleLayoutEvent {
     previousMode: WidgetMode;
     nextMode: WidgetMode;
@@ -244,6 +250,7 @@ export interface LifecycleHooks {
     onInitialize?: (event: InitializeEvent) => void;
     onMessageSent?: (event: MessageSentEvent) => void;
     onStreamUpdate?: (event: StreamUpdateEvent) => void;
+    onConversationCleared?: (event: ConversationClearedEvent) => void;
     onToggleLayout?: (event: ToggleLayoutEvent) => void;
     onOpenChange?: (event: OpenChangeEvent) => void;
     onTeaser?: (event: TeaserEvent) => void;

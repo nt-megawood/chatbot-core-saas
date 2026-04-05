@@ -19,6 +19,15 @@ function randomScopeClass() {
 function toPositionClass(position) {
     return `ccs-pos-${position}`;
 }
+function toError(error) {
+    if (error instanceof Error) {
+        return error;
+    }
+    if (typeof error === "string" && error.trim()) {
+        return new Error(error);
+    }
+    return new Error("Unknown transport error.");
+}
 export class ChatbotWidgetCore {
     config;
     transport;
@@ -145,7 +154,9 @@ export class ChatbotWidgetCore {
         }
         this.open("toggle");
     }
-    clearConversation() {
+    clearConversation(source = "api") {
+        const previousConversationId = this.conversationId;
+        const previousMessageCount = this.messages.length;
         this.stopThinking();
         this.resetAssistantMessageInteractions();
         this.messages = [];
@@ -158,6 +169,12 @@ export class ChatbotWidgetCore {
         this.messages.push(welcomeMessage);
         this.render();
         this.persistSnapshot();
+        this.config.lifecycle.onConversationCleared?.({
+            source,
+            previousConversationId,
+            previousMessageCount,
+            timestamp: this.now()
+        });
     }
     dismissTeaser() {
         if (!this.teaserVisible && this.teaserDismissed) {
@@ -262,40 +279,52 @@ export class ChatbotWidgetCore {
         this.render();
         this.persistSnapshot();
         const streamState = { error: null };
-        await this.transport.sendMessage({
-            message: userMessage,
-            history: [...this.messages],
-            config: this.config,
-            conversationId: this.conversationId
-        }, {
-            onChunk: (chunk) => {
-                if (chunk) {
-                    this.stopThinking();
+        try {
+            await this.transport.sendMessage({
+                message: userMessage,
+                history: [...this.messages],
+                config: this.config,
+                conversationId: this.conversationId
+            }, {
+                onChunk: (chunk) => {
+                    if (chunk) {
+                        this.stopThinking();
+                    }
+                    assistantMessage.state = "streaming";
+                    assistantMessage.text = `${assistantMessage.text}${chunk}`;
+                    this.config.lifecycle.onStreamUpdate?.({
+                        messageId: assistantMessage.id,
+                        chunk,
+                        accumulatedText: assistantMessage.text,
+                        isFinal: false,
+                        timestamp: this.now()
+                    });
+                    this.render();
+                },
+                onComplete: (meta) => {
+                    streamState.actions = meta?.actions;
+                    streamState.conversationId = meta?.conversationId;
+                    streamState.metadata = meta?.metadata;
+                },
+                onError: (error) => {
+                    streamState.error = error;
                 }
-                assistantMessage.state = "streaming";
-                assistantMessage.text = `${assistantMessage.text}${chunk}`;
-                this.config.lifecycle.onStreamUpdate?.({
-                    messageId: assistantMessage.id,
-                    chunk,
-                    accumulatedText: assistantMessage.text,
-                    isFinal: false,
-                    timestamp: this.now()
-                });
-                this.render();
-            },
-            onComplete: (meta) => {
-                streamState.actions = meta?.actions;
-                streamState.conversationId = meta?.conversationId;
-                streamState.metadata = meta?.metadata;
-            },
-            onError: (error) => {
-                streamState.error = error;
-            }
-        });
+            });
+        }
+        catch (error) {
+            streamState.error = streamState.error ?? toError(error);
+        }
         if (streamState.error) {
             this.stopThinking();
             assistantMessage.state = "error";
             assistantMessage.text = `Unable to stream response: ${streamState.error.message}`;
+            this.config.lifecycle.onStreamUpdate?.({
+                messageId: assistantMessage.id,
+                chunk: "",
+                accumulatedText: assistantMessage.text,
+                isFinal: true,
+                timestamp: this.now()
+            });
             this.render();
             this.persistSnapshot();
             throw streamState.error;
@@ -904,7 +933,7 @@ export class ChatbotWidgetCore {
         const closeButton = rootElement.querySelector("[data-close-chat]");
         closeButton?.addEventListener("click", () => this.close("header-close"));
         const refreshButton = rootElement.querySelector("[data-refresh-chat]");
-        refreshButton?.addEventListener("click", () => this.clearConversation());
+        refreshButton?.addEventListener("click", () => this.clearConversation("refresh"));
         const openFromTeaserButton = rootElement.querySelector("[data-open-from-teaser]");
         openFromTeaserButton?.addEventListener("click", () => this.open("teaser-open"));
         const dismissTeaserButton = rootElement.querySelector("[data-dismiss-teaser]");
