@@ -1,180 +1,184 @@
-# chatbot-core-saas
+<a id="readme-top"></a>
 
-chatbot-core-saas is the tenant-neutral widget runtime for chatbot consumers.
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
 
-It owns layout, rendering, state, transport contracts, persistence, lifecycle hooks, and extension points. It does not own any company branding, business prompt strategy, backend policy, or conversion semantics.
+<br />
+<div align="center">
+  <h3 align="center">ConversaCore</h3>
 
-## Strict boundary
+  <p align="center">
+    Tenant-neutral chatbot widget runtime for SaaS implementations.
+    <br />
+    <a href="./docs/README.md"><strong>Explore the docs</strong></a>
+    <br />
+    <br />
+    <a href="https://nt-megawood.github.io/chatbot-core-saas/dist/index.js">Live artifact</a>
+    &middot;
+    <a href="https://github.com/nt-megawood/chatbot-core-saas/issues">Report Bug</a>
+    &middot;
+    <a href="https://github.com/nt-megawood/chatbot-core-saas/issues">Request Feature</a>
+  </p>
+</div>
 
-Core includes only generic runtime behavior.
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#built-with">Built With</a></li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#project-boundary">Project Boundary</a></li>
+    <li><a href="#documentation">Documentation</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+  </ol>
+</details>
 
-- Included in core: shell/layout rendering, message lifecycle, action execution model, i18n resolution, storage and restore, presence orchestration, panel/render extension contracts.
-- Not included in core: logos, brand tokens/copy, company prompt-pack taxonomy, company analytics schemas, company planner/dealer business logic.
+## About The Project
 
-If behavior is reusable across tenants, it belongs here. If behavior is business or brand specific, it belongs in the consumer package.
+ConversaCore is the reusable runtime core for chatbot widget experiences.
 
-## Generic capabilities (current architecture)
+It contains:
 
-- Entry/context model: configurable pre-chat entry fields with optional gating before send.
-- Starter packs: reusable starter prompts with click events and custom handler support.
-- Quick replies and action model: assistant actions via message actions (send_message/open_url/custom).
-- Structured input cards: schema-driven input collection with submit handling and optional message templating.
-- Landscape panel extension contract: render/bind/onError hooks with contract id/version metadata.
-- HTTP non-stream adapter: wrap non-stream backends into streaming-compatible chunks.
-- Session restore + migration: versioned storage snapshots with migrate callbacks and restore lifecycle event.
-- Expanded lifecycle hooks: initialize, message/stream, open/teaser/presence, entry/starter/input-card, actions, restore.
-- i18n copy overrides: locale/fallback/custom translations plus direct message overrides.
-- Density/theme variants: density (compact/normal/spacious) and themeVariant (default/outlined/elevated).
+- UI shell and rendering (normal and landscape modes)
+- transport abstraction and adapters
+- message state and action model
+- session restore and migration hooks
+- i18n and lifecycle extension points
 
-## Quick usage patterns
+It deliberately does not contain company branding or business-specific workflows.
 
-### 1) Base widget + entry/starter/input card
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Built With
+
+- TypeScript
+- Vitest
+- Browser ESM distribution
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies
+
+```sh
+npm install
+```
+
+3. Run checks
+
+```sh
+npm run typecheck
+npm run test
+npm run build
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Usage
 
 ```ts
 import { ChatbotWidgetCore } from "chatbot-core-saas";
 
 const widget = new ChatbotWidgetCore({
   apiEndpoint: "https://example.com/chat",
-  socketUrl: "wss://example.com/chat",
-  density: "compact",
-  themeVariant: "outlined",
-  entry: {
-    enabled: true,
-    requiredBeforeSend: true,
-    title: "Before we start",
-    description: "Share context.",
-    submitLabel: "Continue",
-    persistValues: true,
-    fields: [
-      {
-        id: "audience",
-        label: "Audience",
-        type: "select",
-        required: true,
-        options: [
-          { value: "consumer", label: "Consumer" },
-          { value: "pro", label: "Professional" }
-        ]
-      }
-    ]
-  },
-  starterPacks: {
-    enabled: true,
-    hideAfterInteraction: true,
-    showBeforeFirstUserMessage: true,
-    packs: [
-      {
-        id: "getting-started",
-        title: "Try one",
-        items: [
-          { id: "a", label: "Compare products", message: "Help me compare products." },
-          { id: "b", label: "Find support", message: "I need support options." }
-        ]
-      }
-    ]
-  },
-  inputCard: {
-    enabled: true,
-    id: "structured",
-    title: "Structured input",
-    description: "",
-    submitLabel: "Submit",
-    submitBehavior: "none",
-    resetOnSubmit: true,
-    persistValues: true,
-    fields: [{ id: "city", label: "City", type: "text", required: true }]
-  }
+  socketUrl: "wss://example.com/chat"
 });
 
 widget.mount(document.getElementById("chat-root") as HTMLElement);
 ```
 
-### 2) Non-stream HTTP adapter + restore migration + lifecycle + i18n
+For deeper examples, see the docs index.
 
-```ts
-import {
-  ChatbotWidgetCore,
-  createNonStreamingTransportAdapter
-} from "chatbot-core-saas";
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-const legacyTransport = createNonStreamingTransportAdapter(async (request) => {
-  const response = await fetch("https://example.com/legacy-chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: request.message.text, conversationId: request.conversationId })
-  });
-  const payload = await response.json();
-  return { text: String(payload.text || "") };
-});
+## Project Boundary
 
-const widget = new ChatbotWidgetCore(
-  {
-    apiEndpoint: "https://example.com/chat",
-    socketUrl: "wss://example.com/chat",
-    i18n: {
-      locale: "de",
-      fallbackLocale: "en",
-      messages: { sendMessageLabel: "Senden" }
-    },
-    storage: {
-      version: 3,
-      migrate: (snapshot, context) => {
-        if (context.fromVersion < 3) {
-          return { ...snapshot, version: 3 };
-        }
-        return snapshot;
-      }
-    },
-    lifecycle: {
-      onSessionRestore: (event) => console.info("restore", event.status),
-      onEntrySubmitted: (event) => console.info("entry", event.values),
-      onInputCardSubmitted: (event) => console.info("card", event.values),
-      onAssistantActionInvoked: (event) => console.info("assistant-action", event.action)
-    }
-  },
-  { transport: legacyTransport }
-);
-```
+Included in this core:
 
-### 3) Landscape panel extension contract
+- generic widget behavior reusable across tenants
+- runtime APIs and extension contracts
 
-```ts
-const widget = new ChatbotWidgetCore({
-  apiEndpoint: "https://example.com/chat",
-  socketUrl: "wss://example.com/chat",
-  mode: "landscape",
-  allowRuntimeModeSwitch: true,
-  landscapePanel: {
-    id: "my-panel",
-    contractVersion: 1,
-    render: ({ contract }) => `<div>Panel ${contract.extensionId} v${contract.contractVersion}</div>`,
-    bind: ({ panelElement, widget }) => {
-      panelElement.addEventListener("click", () => {
-        void widget.sendMessage("Open planner context");
-      });
-      return () => {
-        panelElement.replaceChildren();
-      };
-    }
-  }
-});
-```
+Not included in this core:
 
-## Build and publish expectation
+- company logos/tone/campaign copy
+- dealer/planner business logic
+- tenant-specific analytics schemas
 
-Consumers depend on built artifacts in dist.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-- Run checks before publishing: npm run typecheck, npm run test, npm run build
-- Commit and publish updated dist output whenever public APIs or runtime behavior change.
-- Browser URL consumers currently resolve core from dist/index.js (for example GitHub Pages based hosting).
+## Documentation
 
-## Package exports
+- [Documentation index](docs/README.md)
+- [Quickstart](docs/quickstart.md)
+- [Configuration](docs/configuration.md)
+- [Runtime API](docs/runtime-api.md)
+- [Transport adapters](docs/transport.md)
+- [Entry, starters and input cards](docs/entry-starters-cards.md)
+- [i18n](docs/i18n.md)
+- [Lifecycle hooks](docs/lifecycle-hooks.md)
+- [Panel extension contract](docs/panel-extension.md)
+- [Session restore and migration](docs/session-restore.md)
+- [Security and repo policy](docs/security-and-repo-policy.md)
 
-- ChatbotWidgetCore
-- createHttpJsonTransport
-- createNonStreamingTransportAdapter
-- createLocalStorageConversationStore
-- loadConfigFromScript
-- renderMarkdown
-- getBuiltinI18nMessages / resolveI18nConfig
-- all public types from src/types.ts
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Roadmap
+
+- [ ] Expand versioned migration examples
+- [ ] Add additional transport examples
+- [ ] Add public changelog discipline
+
+See the [open issues](https://github.com/nt-megawood/chatbot-core-saas/issues) for tracked work.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Contributing
+
+Contributions are welcome.
+
+1. Fork the Project
+2. Create your Feature Branch
+3. Commit your Changes
+4. Push to the Branch
+5. Open a Pull Request
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## License
+
+Distributed under the MIT License.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS -->
+[contributors-shield]: https://img.shields.io/github/contributors/nt-megawood/chatbot-core-saas.svg?style=for-the-badge
+[contributors-url]: https://github.com/nt-megawood/chatbot-core-saas/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/nt-megawood/chatbot-core-saas.svg?style=for-the-badge
+[forks-url]: https://github.com/nt-megawood/chatbot-core-saas/network/members
+[stars-shield]: https://img.shields.io/github/stars/nt-megawood/chatbot-core-saas.svg?style=for-the-badge
+[stars-url]: https://github.com/nt-megawood/chatbot-core-saas/stargazers
+[issues-shield]: https://img.shields.io/github/issues/nt-megawood/chatbot-core-saas.svg?style=for-the-badge
+[issues-url]: https://github.com/nt-megawood/chatbot-core-saas/issues
+[license-shield]: https://img.shields.io/github/license/nt-megawood/chatbot-core-saas.svg?style=for-the-badge
+[license-url]: https://github.com/nt-megawood/chatbot-core-saas/blob/main/LICENSE

@@ -4,6 +4,8 @@
 # Explicitly tracked deliverables
 !.gitignore
 !README.md
+!docs/
+!docs/**
 !dist/
 !dist/**
 
