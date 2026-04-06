@@ -1,0 +1,21 @@
+﻿# Default deny: keep repository artifact-only
+*
+
+# Explicitly tracked deliverables
+!.gitignore
+!README.md
+!dist/
+!dist/**
+
+# Hard blocks to prevent source leakage
+src/
+tests/
+**/*.map
+**/*.ts
+**/*.tsx
+**/*.jsx
+**/*.mts
+**/*.cts
+
+# Allow runtime bundle files
+!dist/**/*.js
